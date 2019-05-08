@@ -7,22 +7,19 @@ import os
 import sys
 import time
 from datetime import datetime
-import SQUEESAR.pysqsar_utilities as pysq
+import pysqsar_utilities as pysq
+from rinsar.utils.process_utilities import create_or_update_template
+from rinsar.objects.auto_defaults import PathFind
 
-#from dask import delayed, compute
+
+pathObj = PathFind()
 #######################
 
 def create_parser():
     """ Creates command line argument parser object. """
     parser = argparse.ArgumentParser(description='Divides the whole scene into patches for parallel processing')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
-    parser.add_argument('-s', '--slc_dir', dest='slc_dir', type=str, required=True, help='Input SLC directory')
-    parser.add_argument('-q', '--squeesar_dir', dest='output_dir', type=str, required=True, help='Patch directory')
-    parser.add_argument('-p', '--patch_size', dest='patch_size', type=str, default='200', help='Patch size')
-    parser.add_argument('-r', '--range_window', dest='range_win', type=str, default='21'
-                        , help='SHP searching window size in range direction. -- Default : 21')
-    parser.add_argument('-a', '--azimuth_window', dest='azimuth_win', type=str, default='15'
-                        , help='SHP searching window size in azimuth direction. -- Default : 15')
+    parser.add_argument('customTemplateFile', nargs='?', help='custom template with option settings.\n')
 
     return parser
 
@@ -35,88 +32,102 @@ def command_line_parse(args):
     return inps
 
 
-def create_patch(inps, name):
+def create_patch(name):
     patch_row, patch_col = name.split('_')
     patch_row, patch_col = (int(patch_row), int(patch_col))
-    patch_name = inps.patch_dir + str(patch_row) + '_' + str(patch_col)
+    patch_name = pathObj.patch_dir + str(patch_row) + '_' + str(patch_col)
 
-    line = inps.patch_rows[1][0][patch_row] - inps.patch_rows[0][0][patch_row]
-    sample = inps.patch_cols[1][0][patch_col] - inps.patch_cols[0][0][patch_col]
+    line = pathObj.patch_rows[1][0][patch_row] - pathObj.patch_rows[0][0][patch_row]
+    sample = pathObj.patch_cols[1][0][patch_col] - pathObj.patch_cols[0][0][patch_col]
 
 
     if not os.path.isfile(patch_name + '/count.npy'):
         if not os.path.isdir(patch_name):
             os.mkdir(patch_name)
 
-        rslc = np.memmap(patch_name + '/RSLC', dtype=np.complex64, mode='w+', shape=(inps.n_image, line, sample))
+        rslc = np.memmap(patch_name + '/RSLC', dtype=np.complex64, mode='w+', shape=(pathObj.n_image, line, sample))
 
         count = 0
 
-        for dirs in inps.list_slv:
-            data_name = inps.slave_dir + '/' + dirs + '/' + dirs + '.slc'
-            slc = np.memmap(data_name, dtype=np.complex64, mode='r', shape=(inps.lin, inps.sam))
+        for dirs in pathObj.list_slv:
+            data_name = pathObj.slave_dir + '/' + dirs + '/' + dirs + '.slc'
+            slc = np.memmap(data_name, dtype=np.complex64, mode='r', shape=(pathObj.lin, pathObj.sam))
 
-            rslc[count, :, :] = slc[inps.patch_rows[0][0][patch_row]:inps.patch_rows[1][0][patch_row],
-                                inps.patch_cols[0][0][patch_col]:inps.patch_cols[1][0][patch_col]]
+            rslc[count, :, :] = slc[pathObj.patch_rows[0][0][patch_row]:pathObj.patch_rows[1][0][patch_row],
+                                pathObj.patch_cols[0][0][patch_col]:pathObj.patch_cols[1][0][patch_col]]
             count += 1
             del slc
 
         del rslc
 
-        np.save(patch_name + '/count.npy', [inps.n_image,line,sample])
+        np.save(patch_name + '/count.npy', [pathObj.n_image,line,sample])
     else:
         print('Next patch...')
     return "PATCH" + str(patch_row) + '_' + str(patch_col) + " is created"
 
 
 ########################################################
+
+
 def main(iargs=None):
     """
         Divides the whole scene into patches for parallel processing
     """
 
     inps = command_line_parse(iargs)
-    inps.slave_dir = inps.slc_dir
-    inps.sq_dir = inps.output_dir
-    inps.patch_dir = inps.sq_dir + '/PATCH'
-    inps.list_slv = os.listdir(inps.slave_dir)
-    inps.list_slv = [datetime.strptime(x, '%Y%m%d') for x in inps.list_slv]
-    inps.list_slv = np.sort(inps.list_slv)
-    inps.list_slv = [x.strftime('%Y%m%d') for x in inps.list_slv]
+    inps = create_or_update_template(inps)
+    inps.squeesar_dir = os.path.join(inps.work_dir, pathObj.squeesardir)
+    pathObj.patch_dir = inps.squeesar_dir + '/PATCH'
 
-    inps.range_win = int(inps.range_win)
-    inps.azimuth_win = int(inps.azimuth_win)
+    pathObj.slave_dir = os.path.join(inps.work_dir, pathObj.mergedslcdir)
+    
+    pathObj.list_slv = os.listdir(pathObj.slave_dir)
+    pathObj.list_slv = [datetime.strptime(x, '%Y%m%d') for x in pathObj.list_slv]
+    pathObj.list_slv = np.sort(pathObj.list_slv)
+    pathObj.list_slv = [x.strftime('%Y%m%d') for x in pathObj.list_slv]
 
-    if not os.path.isdir(inps.sq_dir):
-        os.mkdir(inps.sq_dir)
+    inps.range_window = int(inps.range_window)
+    inps.azimuth_window = int(inps.azimuth_window)
 
-    slc = pysq.read_image(inps.slave_dir + '/' + inps.list_slv[0] + '/' + inps.list_slv[0] + '.slc')  #
-    inps.n_image = len(inps.list_slv)
-    inps.lin = slc.shape[0]
-    inps.sam = slc.shape[1]
+    if not os.path.isdir(inps.squeesar_dir):
+        os.mkdir(inps.squeesar_dir)
+
+    slc = pysq.read_image(pathObj.slave_dir + '/' + pathObj.list_slv[0] + '/' + pathObj.list_slv[0] + '.slc')  #
+    pathObj.n_image = len(pathObj.list_slv)
+    pathObj.lin = slc.shape[0]
+    pathObj.sam = slc.shape[1]
     del slc
 
-    inps.patch_rows, inps.patch_cols, inps.patch_list = \
-        pysq.patch_slice(inps.lin, inps.sam, inps.azimuth_win, inps.range_win, np.int(inps.patch_size))
+    pathObj.patch_rows, pathObj.patch_cols, inps.patch_list = \
+        pysq.patch_slice(pathObj.lin, pathObj.sam, inps.azimuth_window, inps.range_window, np.int(inps.patch_size))
 
-    np.save(inps.sq_dir + '/rowpatch.npy', inps.patch_rows)
-    np.save(inps.sq_dir + '/colpatch.npy', inps.patch_cols)
+    np.save(inps.squeesar_dir + '/rowpatch.npy', pathObj.patch_rows)
+    np.save(inps.squeesar_dir + '/colpatch.npy', pathObj.patch_cols)
 
     time0 = time.time()
-    if os.path.isfile(inps.sq_dir + '/flag.npy'):
+    if os.path.isfile(inps.squeesar_dir + '/flag.npy'):
         print('patchlist exist')
     else:
+
+        futures = []
+        start_time = time.time()
+
         for patch in inps.patch_list:
-            create_patch(inps, patch)
+            future = client.submit(create_patch, patch, retries=3)
+            futures.append(future)
 
-        # values = [delayed(create_patch)(inps, x) for x in inps.patch_list]
-        # compute(*values, scheduler='processes')
+        i_future = 0
+        for future, result in as_completed(futures, with_results=True):
+            i_future += 1
+            print("FUTURE #" + str(i_future), "complete in", time.time() - start_time, "seconds.")
 
-    np.save(inps.sq_dir + '/flag.npy', 'patchlist_created')
+    np.save(inps.squeesar_dir + '/flag.npy', 'patchlist_created')
     timep = time.time() - time0
 
-
     print("Done Creating PATCH. time:{} min".format(timep/60))
+
+    cluster.close()
+    client.close()
 
 
 if __name__ == '__main__':
@@ -124,4 +135,28 @@ if __name__ == '__main__':
     Divides the whole scene into patches for parallel processing.
 
     '''
+
+    try:
+        from dask.distributed import Client, as_completed
+        # dask_jobqueue is needed for HPC.
+        # PBSCluster (similar to LSFCluster) should also work out of the box
+        from dask_jobqueue import LSFCluster
+        python_executable_location = sys.executable
+        # Look at the ~/.config/dask/dask_pysar.yaml file for Changing the Dask configuration defaults
+        cluster = LSFCluster(config_name='create_patch',
+                             python=python_executable_location)
+        NUM_WORKERS = 40
+        cluster.scale(NUM_WORKERS)
+        print("JOB FILE:", cluster.job_script())
+        # This line needs to be in a function or in a `if __name__ == "__main__":` block. If it is in no function
+        # or "main" block, each worker will try to create its own client (which is bad) when loading the module
+        client = Client(cluster)
+
+    except:
+
+        from distributed import Client, LocalCluster
+
+        cluster = LocalCluster()
+        client = Client(cluster)
+
     main()

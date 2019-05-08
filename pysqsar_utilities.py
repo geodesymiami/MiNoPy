@@ -4,7 +4,8 @@
 # Author: Sara Mirzaee
 # Created: 10/2018
 ###############################################################################
-import sys, os
+import sys
+import os
 import numpy as np
 import cmath
 from numpy import linalg as LA
@@ -13,7 +14,7 @@ import gdal
 import isce
 import isceobj
 
-######################################################################################
+################################################################################
 
 
 def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east, status='multilook'):
@@ -28,21 +29,16 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
 
     ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
     lon = ds.GetRasterBand(1).ReadAsArray()
-    lon = lon[lat_c,:]
+    lon = lon[lat_c, :]
     del ds
-
 
     idx_lon = np.where((lon >= lon_west) & (lon <= lon_east))
 
-
     lon_c = np.int(np.mean(idx_lon))
 
-
-    lat = lat[:,lon_c]
+    lat = lat[:, lon_c]
 
     idx_lat = np.where((lat >= lat_south) & (lat <= lat_north))
-
-
 
     first_row = np.min(idx_lat)
     last_row = np.max(idx_lat)
@@ -54,7 +50,32 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
 
     return image_coord
 
-################################################################################
+##############################################################################
+
+
+def patch_slice(lines, samples, azimuth_window, range_window, patch_size=200):
+    """ Devides an image into patches of size 200 by 200 by considering the overlay of the size of multilook window."""
+
+    patch_row_1 = np.ogrid[0:lines-50:patch_size]
+    patch_row_2 = patch_row_1+patch_size
+    patch_row_2[-1] = lines
+    patch_row_1[1::] = patch_row_1[1::] - 2*azimuth_window
+
+    patch_col_1 = np.ogrid[0:samples-50:patch_size]
+    patch_col_2 = patch_col_1+patch_size
+    patch_col_2[-1] = samples
+    patch_col_1[1::] = patch_col_1[1::] - 2*range_window
+    patch_row = [[patch_row_1], [patch_row_2]]
+    patch_cols = [[patch_col_1], [patch_col_2]]
+    patchlist = []
+
+    for row in range(len(patch_row_1)):
+        for col in range(len(patch_col_1)):
+            patchlist.append(str(row) + '_' + str(col))
+
+    return patch_row, patch_cols, patchlist
+
+##############################################################################
 
 
 def read_slc_and_crop(slc_file, first_row, last_row, first_col, last_col):
@@ -259,30 +280,6 @@ def trwin(x):
         x1[t, :, :] = x[t, :, :].transpose()
 
     return x1
-
-###############################################################################
-
-
-def patch_slice(lin,sam,waz,wra,patch_size=200):
-    """ Devides an image into patches of size 300 by 300 by considering the overlay of the size of multilook window."""
-
-    pr1 = np.ogrid[0:lin-50:patch_size]
-    pr2 = pr1+patch_size
-    pr2[-1] = lin
-    pr1[1::] = pr1[1::] - 2*waz
-
-    pc1 = np.ogrid[0:sam-50:patch_size]
-    pc2 = pc1+patch_size
-    pc2[-1] = sam
-    pc1[1::] = pc1[1::] - 2*wra
-    pr = [[pr1], [pr2]]
-    pc = [[pc1], [pc2]]
-    patchlist = []
-    for n1 in range(len(pr1)):
-        for n2 in range(len(pc1)):
-            patchlist.append(str(n1) + '_' + str(n2))
-
-    return pr,pc,patchlist
 
 ###############################################################################
 
