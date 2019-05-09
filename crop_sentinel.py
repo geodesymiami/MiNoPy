@@ -184,7 +184,7 @@ if __name__ == '__main__':
     inps = command_line_parse()
     inps = create_or_update_template(inps)
     inps.geo_master = os.path.join(inps.work_dir, pathObj.geomasterdir)
-    import pdb; pdb.set_trace()
+
     try:
         from dask.distributed import Client, as_completed
         # dask_jobqueue is needed for HPC.
@@ -194,23 +194,25 @@ if __name__ == '__main__':
         # Look at the ~/.config/dask/dask_pysar.yaml file for Changing the Dask configuration defaults
         cluster = LSFCluster(config_name='rsmas_insar',
                              python=python_executable_location,
-                             memory=inps.dask_memory,
-                             walltime=inps.dask_walltime)
-        NUM_WORKERS = inps.dask_num_workers
+                             memory=inps.rinsar_dask_memory,
+                             walltime=inps.rinsar_dask_walltime)
+        NUM_WORKERS = int(inps.rinsar_dask_num_workers)
         cluster.scale(NUM_WORKERS)
+        import pdb; pdb.set_trace()
+
         print("JOB FILE:", cluster.job_script())
         # This line needs to be in a function or in a `if __name__ == "__main__":` block. If it is in no function
         # or "main" block, each worker will try to create its own client (which is bad) when loading the module
         client = Client(cluster)
 
     except:
+        print('parallel not possible')
+        #from distributed import Client, LocalCluster
 
-        from distributed import Client, LocalCluster
-
-        cluster = LocalCluster(config_name='rsmas_insar',
-                             python=python_executable_location,
-                             memory=inps.dask_memory,
-                             walltime=inps.dask_walltime)
-        client = Client(cluster)
+        #cluster = LocalCluster(config_name='rsmas_insar',
+        #                       python=python_executable_location,
+        #                       memory=inps.rinsar_dask_memory,
+        #                       walltime=inps.rinsar_dask_walltime)
+        #client = Client(cluster)
 
     main(inps)
