@@ -198,7 +198,6 @@ if __name__ == '__main__':
                              walltime=inps.rinsar_dask_walltime)
         NUM_WORKERS = int(inps.rinsar_dask_num_workers)
         cluster.scale(NUM_WORKERS)
-        import pdb; pdb.set_trace()
 
         print("JOB FILE:", cluster.job_script())
         # This line needs to be in a function or in a `if __name__ == "__main__":` block. If it is in no function
