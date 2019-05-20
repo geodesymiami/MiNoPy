@@ -14,8 +14,8 @@ import time
 import glob
 from isceobj.Util.ImageUtil import ImageLib as IML
 from mergeBursts import multilook
-from minsar.utils.process_utilities import create_or_update_template, set_dask_memory_walltime
-from pysqsar_utilities import convert_geo2image_coord, patch_slice
+from minsar.utils.process_utilities import create_or_update_template
+from minopy_utilities import convert_geo2image_coord, patch_slice
 from minsar.objects.auto_defaults import PathFind
 
 pathObj = PathFind()
@@ -151,3 +151,4 @@ if __name__ == '__main__':
 
     for item in run_list_geo:
         cropQualitymap(item)
+

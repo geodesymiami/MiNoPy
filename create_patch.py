@@ -7,7 +7,7 @@ import os
 import sys
 import time
 from datetime import datetime
-import pysqsar_utilities as pysq
+import minopy_utilities as pysq
 from rinsar.utils.process_utilities import create_or_update_template
 from rinsar.objects.auto_defaults import PathFind
 
@@ -142,7 +142,7 @@ if __name__ == '__main__':
         # PBSCluster (similar to LSFCluster) should also work out of the box
         from dask_jobqueue import LSFCluster
         python_executable_location = sys.executable
-        # Look at the ~/.config/dask/dask_pysar.yaml file for Changing the Dask configuration defaults
+        # Look at the ~/.config/dask/dask_mintpy.yaml file for Changing the Dask configuration defaults
         cluster = LSFCluster(config_name='create_patch',
                              python=python_executable_location)
         NUM_WORKERS = 40
