@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 ###############################################################################
-# Project: Utilitiels for pysqsar
+# Project: Utilitiels for minopy
 # Author: Sara Mirzaee
 # Created: 10/2018
 ###############################################################################
