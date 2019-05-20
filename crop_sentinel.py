@@ -15,7 +15,7 @@ import glob
 from isceobj.Util.ImageUtil import ImageLib as IML
 from mergeBursts import multilook
 from rinsar.utils.process_utilities import create_or_update_template
-from pysqsar_utilities import convert_geo2image_coord, patch_slice
+from minopy_utilities import convert_geo2image_coord, patch_slice
 from rinsar.objects.auto_defaults import PathFind
 
 pathObj = PathFind()
@@ -191,7 +191,7 @@ if __name__ == '__main__':
         # PBSCluster (similar to LSFCluster) should also work out of the box
         from dask_jobqueue import LSFCluster
         python_executable_location = sys.executable
-        # Look at the ~/.config/dask/dask_pysar.yaml file for Changing the Dask configuration defaults
+        # Look at the ~/.config/dask/dask_mintpy.yaml file for Changing the Dask configuration defaults
         cluster = LSFCluster(config_name='rsmas_insar',
                              python=python_executable_location,
                              memory=inps.rinsar_dask_memory,

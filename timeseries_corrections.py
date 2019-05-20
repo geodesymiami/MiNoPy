@@ -11,7 +11,7 @@ import glob
 import time
 import argparse
 import numpy as np
-from pysar import pysarApp
+from mintpy import smallbaselineApp
 
 
 ##########################################################################
@@ -36,7 +36,7 @@ def create_parser():
                         help='PySAR working directory, default is:\n' +
                              'a) current directory, or\n' +
                              'b) $SCRATCHDIR/projectName/PYSAR, if meets the following 3 requirements:\n' +
-                             '    1) autoPath = True in pysar/defaults/auto_path.py\n' +
+                             '    1) autoPath = True in mintpy/defaults/auto_path.py\n' +
                              '    2) environmental variable $SCRATCHDIR exists\n' +
                              '    3) input custom template with basename same as projectName\n')
     parser.add_argument('-g', dest='generate_template', action='store_true',
@@ -53,7 +53,7 @@ def cmd_line_parse(iargs=None):
     """Command line parser."""
     parser = create_parser()
     inps = parser.parse_args(args=iargs)
-    inps.autoTemplateFile = os.path.join(os.getenv('PYSAR_HOME'), 'docs/pysarApp_template.txt')
+    inps.autoTemplateFile = os.path.join(os.getenv('PYSAR_HOME'), 'defaults/smallbaselineApp_auto.cfg')
 
     if inps.print_auto_template:
         with open(inps.autoTemplateFile, 'r') as f:
@@ -61,7 +61,7 @@ def cmd_line_parse(iargs=None):
         raise SystemExit()
 
     if (inps.customTemplateFile
-            and os.path.basename(inps.customTemplateFile) == 'pysarApp_template.txt'):
+            and os.path.basename(inps.customTemplateFile) == 'smallbaselineApp_auto.cfg'):
         inps.customTemplateFile = None
     return inps
 
@@ -104,7 +104,7 @@ def get_phase_linking_coherence_mask(inps, template):
             raise Exception('Error while generating mask file from temporal coherence.')
 
     # check number of pixels selected in mask file for following analysis
-    min_num_pixel = float(template['pysar.networkInversion.minNumPixel'])
+    min_num_pixel = float(template['mintpy.networkInversion.minNumPixel'])
     msk = readfile.read(inps.maskFile)[0]
     num_pixel = np.sum(msk != 0.)
     print('number of pixels selected: {}'.format(num_pixel))
@@ -121,8 +121,8 @@ def get_phase_linking_coherence_mask(inps, template):
 
 def write_to_timeseries(inps):
 
-    from pysar.objects import ifgramStack, timeseries
-    from pysar.ifgram_inversion import write2hdf5_file, read_unwrap_phase, mask_unwrap_phase
+    from mintpy.objects import ifgramStack, timeseries
+    from mintpy.ifgram_inversion import write2hdf5_file, read_unwrap_phase, mask_unwrap_phase
 
     inps.timeseriesFile = 'timeseries.h5'
     inps.tempCohFile = 'temporalCoherence.h5'
@@ -205,11 +205,11 @@ def main(iargs=None):
     start_time = time.time()
     inps = cmd_line_parse(iargs)
 
-    app = pysarApp.TimeSeriesAnalysis(inps.customTemplateFile, inps.workDir)
+    app = smallbaselineApp.TimeSeriesAnalysis(inps.customTemplateFile, inps.workDir)
     app.startup()
 
-    if app.template['pysar.unwrapError.method']:
-        app.template['pysar.unwrapError.method'] = 'bridging'
+    if app.template['mintpy.unwrapError.method']:
+        app.template['mintpy.unwrapError.method'] = 'bridging'
 
     inps.runSteps = ['load_data',
     'reference_point',
