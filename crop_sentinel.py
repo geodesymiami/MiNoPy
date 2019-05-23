@@ -12,11 +12,13 @@ import isce
 import isceobj
 import time
 import glob
+from minsar.objects import message_rsmas
 from isceobj.Util.ImageUtil import ImageLib as IML
 from mergeBursts import multilook
 from minsar.utils.process_utilities import create_or_update_template
 from minopy_utilities import convert_geo2image_coord, patch_slice
 from minsar.objects.auto_defaults import PathFind
+import dask
 
 pathObj = PathFind()
 ##############################################################################
@@ -47,12 +49,12 @@ def cropSLC(data):
     (input_file, output_file) = data
 
     ds = gdal.Open(input_file + '.vrt', gdal.GA_ReadOnly)
-    inp_file = ds.GetVirtualMemArray()
+    inp_file = ds.GetRasterBand(1).ReadAsArray()[pathObj.first_row:pathObj.last_row, pathObj.first_col:pathObj.last_col]
     data_type = inp_file.dtype.type
     del ds
 
     out_map = np.memmap(output_file, dtype=data_type, mode='write', shape=(pathObj.n_lines, pathObj.width))
-    out_map[:, :] = inp_file[pathObj.first_row:pathObj.last_row, pathObj.first_col:pathObj.last_col]
+    out_map[:, :] = inp_file[:, :]
 
     IML.renderISCEXML(output_file, 1, pathObj.n_lines, pathObj.width, IML.NUMPY_type(str(inp_file.dtype)), 'BIL')
 
@@ -60,6 +62,8 @@ def cropSLC(data):
     out_img.load(output_file + '.xml')
     out_img.renderVRT()
     out_img.renderHdr()
+
+    del inp_file, out_map
 
     return output_file
 
@@ -76,17 +80,21 @@ def cropQualitymap(data):
     scheme = img.scheme
 
     ds = gdal.Open(input_file + '.vrt', gdal.GA_ReadOnly)
-    inp_file = ds.GetVirtualMemArray()
-    del ds
+    inp_file = ds.GetRasterBand(1).ReadAsArray()[pathObj.first_row:pathObj.last_row, pathObj.first_col:pathObj.last_col]
+
+    if bands == 2:
+        inp_file2 = ds.GetRasterBand(2).ReadAsArray()[pathObj.first_row:pathObj.last_row, pathObj.first_col:pathObj.last_col]
+
+    del ds, img
 
     out_map = IML.memmap(output_file, mode='write', nchannels=bands,
                          nxx=pathObj.width, nyy=pathObj.n_lines, scheme=scheme, dataType=data_type)
 
     if bands == 2:
-        out_map.bands[0][:, :] = inp_file[0][pathObj.first_row:pathObj.last_row, pathObj.first_col:pathObj.last_col]
-        out_map.bands[1][:, :] = inp_file[1][pathObj.first_row:pathObj.last_row, pathObj.first_col:pathObj.last_col]
+        out_map.bands[0][:, :] = inp_file[:, :]
+        out_map.bands[1][:, :] = inp_file2[:, :]
     else:
-        out_map.bands[0][:, :] = inp_file[0][pathObj.first_row:pathObj.last_row, pathObj.first_col:pathObj.last_col]
+        out_map.bands[0][:, :] = inp_file[:, :]
 
     IML.renderISCEXML(output_file, bands,
                       pathObj.n_lines, pathObj.width,
@@ -101,7 +109,9 @@ def cropQualitymap(data):
     except:
         pass
 
-    del out_map
+    del out_map, inp_file
+    if bands == 2:
+        del inp_file2
 
     return output_file
 
@@ -110,7 +120,8 @@ if __name__ == '__main__':
     '''
     Crop SLCs and geometry.
     '''
-
+    message_rsmas.log(os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
+    
     inps = command_line_parse()
     inps = create_or_update_template(inps)
     inps.geo_master = os.path.join(inps.work_dir, pathObj.geomasterdir)
@@ -140,15 +151,21 @@ if __name__ == '__main__':
     run_list_geo = []
 
     for item in slc_list:
-        run_list_slc.append((item, item.split('.full')[0]))
+        run_list_slc.append((item, item.split('.full')[0] + '.subset'))
 
     for item in meta_data:
         run_list_geo.append((os.path.join(inps.geo_master, item + '.rdr.full'),
-                                  os.path.join(inps.geo_master, item + '.rdr')))
+                                  os.path.join(inps.geo_master, item + '.rdr.subset')))
+
+    futures = []
+    start_time = time.time()
 
     for item in run_list_slc:
-        cropSLC(item)
+        future = dask.delayed(cropSLC)(item)
+        futures.append(future)
 
     for item in run_list_geo:
-        cropQualitymap(item)
+        future = dask.delayed(cropQualitymap)(item)
+        futures.append(future)
 
+    results = dask.compute(*futures)

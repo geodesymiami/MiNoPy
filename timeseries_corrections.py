@@ -72,9 +72,6 @@ def get_phase_linking_coherence_mask(inps, template):
 
     inps.maskFile = 'maskTempCoh.h5'
 
-
-
-
     maskCmd = 'generate_mask.py {} -m {} -M {} -o {} --shadow {}'.format(inps.tempCohFile,
                                                                    inps.vmin,
                                                                    inps.vmax,

@@ -6,14 +6,57 @@ import argparse
 import os
 import sys
 import time
+from minsar.objects import message_rsmas
 from datetime import datetime
-import minopy_utilities as pysq
-from rinsar.utils.process_utilities import create_or_update_template
-from rinsar.objects.auto_defaults import PathFind
-
+import minopy_utilities as mnp
+from minsar.utils.process_utilities import create_or_update_template
+from minsar.objects.auto_defaults import PathFind
+import dask
 
 pathObj = PathFind()
 #######################
+
+
+def main(iargs=None):
+    """
+        Divides the whole scene into patches for parallel processing
+    """
+    message_rsmas.log(os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
+    
+    inps = command_line_parse(iargs)
+    inps = create_or_update_template(inps)
+    inps.minopy_dir = os.path.join(inps.work_dir, pathObj.minopydir)
+    pathObj.patch_dir = inps.minopy_dir + '/PATCH'
+
+    pathObj.slave_dir = os.path.join(inps.work_dir, pathObj.mergedslcdir)
+    
+    pathObj.list_slv = os.listdir(pathObj.slave_dir)
+    pathObj.list_slv = [datetime.strptime(x, '%Y%m%d') for x in pathObj.list_slv]
+    pathObj.list_slv = np.sort(pathObj.list_slv)
+    pathObj.list_slv = [x.strftime('%Y%m%d') for x in pathObj.list_slv]
+
+    inps.range_window = int(inps.template['minopy.range_window'])
+    inps.azimuth_window = int(inps.template['minopy.azimuth_window'])
+
+    if not os.path.isdir(inps.minopy_dir):
+        os.mkdir(inps.minopy_dir)
+
+    slc = mnp.read_image(pathObj.slave_dir + '/' + pathObj.list_slv[0] + '/' + pathObj.list_slv[0] + '.slc.subset')  #
+    pathObj.n_image = len(pathObj.list_slv)
+    pathObj.lin = slc.shape[0]
+    pathObj.sam = slc.shape[1]
+    del slc
+
+    pathObj.patch_rows, pathObj.patch_cols, inps.patch_list = \
+        mnp.patch_slice(pathObj.lin, pathObj.sam, inps.azimuth_window, inps.range_window, np.int(inps.template['minopy.patch_size']))
+
+    np.save(inps.minopy_dir + '/rowpatch.npy', pathObj.patch_rows)
+    np.save(inps.minopy_dir + '/colpatch.npy', pathObj.patch_cols)
+
+    submit_dask_job(inps.patch_list, inps.minopy_dir)
+
+    return
+
 
 def create_parser():
     """ Creates command line argument parser object. """
@@ -40,7 +83,6 @@ def create_patch(name):
     line = pathObj.patch_rows[1][0][patch_row] - pathObj.patch_rows[0][0][patch_row]
     sample = pathObj.patch_cols[1][0][patch_col] - pathObj.patch_cols[0][0][patch_col]
 
-
     if not os.path.isfile(patch_name + '/count.npy'):
         if not os.path.isdir(patch_name):
             os.mkdir(patch_name)
@@ -50,7 +92,7 @@ def create_patch(name):
         count = 0
 
         for dirs in pathObj.list_slv:
-            data_name = pathObj.slave_dir + '/' + dirs + '/' + dirs + '.slc'
+            data_name = pathObj.slave_dir + '/' + dirs + '/' + dirs + '.slc.subset'
             slc = np.memmap(data_name, dtype=np.complex64, mode='r', shape=(pathObj.lin, pathObj.sam))
 
             rslc[count, :, :] = slc[pathObj.patch_rows[0][0][patch_row]:pathObj.patch_rows[1][0][patch_row],
@@ -63,71 +105,30 @@ def create_patch(name):
         np.save(patch_name + '/count.npy', [pathObj.n_image,line,sample])
     else:
         print('Next patch...')
-    return "PATCH" + str(patch_row) + '_' + str(patch_col) + " is created"
+    return print("PATCH" + str(patch_row) + '_' + str(patch_col) + " is created")
 
 
-########################################################
+def submit_dask_job(patch_list, minopy_dir):
 
 
-def main(iargs=None):
-    """
-        Divides the whole scene into patches for parallel processing
-    """
-
-    inps = command_line_parse(iargs)
-    inps = create_or_update_template(inps)
-    inps.squeesar_dir = os.path.join(inps.work_dir, pathObj.squeesardir)
-    pathObj.patch_dir = inps.squeesar_dir + '/PATCH'
-
-    pathObj.slave_dir = os.path.join(inps.work_dir, pathObj.mergedslcdir)
-    
-    pathObj.list_slv = os.listdir(pathObj.slave_dir)
-    pathObj.list_slv = [datetime.strptime(x, '%Y%m%d') for x in pathObj.list_slv]
-    pathObj.list_slv = np.sort(pathObj.list_slv)
-    pathObj.list_slv = [x.strftime('%Y%m%d') for x in pathObj.list_slv]
-
-    inps.range_window = int(inps.range_window)
-    inps.azimuth_window = int(inps.azimuth_window)
-
-    if not os.path.isdir(inps.squeesar_dir):
-        os.mkdir(inps.squeesar_dir)
-
-    slc = pysq.read_image(pathObj.slave_dir + '/' + pathObj.list_slv[0] + '/' + pathObj.list_slv[0] + '.slc')  #
-    pathObj.n_image = len(pathObj.list_slv)
-    pathObj.lin = slc.shape[0]
-    pathObj.sam = slc.shape[1]
-    del slc
-
-    pathObj.patch_rows, pathObj.patch_cols, inps.patch_list = \
-        pysq.patch_slice(pathObj.lin, pathObj.sam, inps.azimuth_window, inps.range_window, np.int(inps.patch_size))
-
-    np.save(inps.squeesar_dir + '/rowpatch.npy', pathObj.patch_rows)
-    np.save(inps.squeesar_dir + '/colpatch.npy', pathObj.patch_cols)
-
-    time0 = time.time()
-    if os.path.isfile(inps.squeesar_dir + '/flag.npy'):
+    if os.path.isfile(minopy_dir + '/flag.npy'):
         print('patchlist exist')
     else:
 
         futures = []
         start_time = time.time()
 
-        for patch in inps.patch_list:
-            future = client.submit(create_patch, patch, retries=3)
-            futures.append(future)
+        for patch in patch_list:
+            futures.append(dask.delayed(create_patch)(patch))
 
-        i_future = 0
-        for future, result in as_completed(futures, with_results=True):
-            i_future += 1
-            print("FUTURE #" + str(i_future), "complete in", time.time() - start_time, "seconds.")
+        results = dask.compute(*futures)
 
-    np.save(inps.squeesar_dir + '/flag.npy', 'patchlist_created')
-    timep = time.time() - time0
+    np.save(minopy_dir + '/flag.npy', 'patchlist_created')
+    timep = time.time() - start_time
 
-    print("Done Creating PATCH. time:{} min".format(timep/60))
+    print('All patches created in {} seconds'.format(timep))
 
-    cluster.close()
-    client.close()
+    return
 
 
 if __name__ == '__main__':
@@ -135,28 +136,4 @@ if __name__ == '__main__':
     Divides the whole scene into patches for parallel processing.
 
     '''
-
-    try:
-        from dask.distributed import Client, as_completed
-        # dask_jobqueue is needed for HPC.
-        # PBSCluster (similar to LSFCluster) should also work out of the box
-        from dask_jobqueue import LSFCluster
-        python_executable_location = sys.executable
-        # Look at the ~/.config/dask/dask_mintpy.yaml file for Changing the Dask configuration defaults
-        cluster = LSFCluster(config_name='create_patch',
-                             python=python_executable_location)
-        NUM_WORKERS = 40
-        cluster.scale(NUM_WORKERS)
-        print("JOB FILE:", cluster.job_script())
-        # This line needs to be in a function or in a `if __name__ == "__main__":` block. If it is in no function
-        # or "main" block, each worker will try to create its own client (which is bad) when loading the module
-        client = Client(cluster)
-
-    except:
-
-        from distributed import Client, LocalCluster
-
-        cluster = LocalCluster()
-        client = Client(cluster)
-
     main()
