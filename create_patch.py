@@ -5,6 +5,7 @@ import numpy as np
 import argparse
 import os
 import sys
+import shutil
 import time
 from minsar.objects import message_rsmas
 from datetime import datetime
@@ -28,6 +29,14 @@ def main(iargs=None):
     inps.minopy_dir = os.path.join(inps.work_dir, pathObj.minopydir)
     pathObj.patch_dir = inps.minopy_dir + '/PATCH'
 
+    pathObj.int_dir = os.path.join(inps.work_dir, pathObj.mergedintdir)
+
+    if os.path.exists(pathObj.int_dir):
+        shutil.rmtree(pathObj.int_dir)
+        os.mkdir(pathObj.int_dir)
+    else:
+        os.mkdir(pathObj.int_dir)
+
     pathObj.slave_dir = os.path.join(inps.work_dir, pathObj.mergedslcdir)
     
     pathObj.list_slv = os.listdir(pathObj.slave_dir)
@@ -41,7 +50,7 @@ def main(iargs=None):
     if not os.path.isdir(inps.minopy_dir):
         os.mkdir(inps.minopy_dir)
 
-    slc = mnp.read_image(pathObj.slave_dir + '/' + pathObj.list_slv[0] + '/' + pathObj.list_slv[0] + '.slc.subset')  #
+    slc = mnp.read_image(pathObj.slave_dir + '/' + pathObj.list_slv[0] + '/' + pathObj.list_slv[0] + '.slc')  #
     pathObj.n_image = len(pathObj.list_slv)
     pathObj.lin = slc.shape[0]
     pathObj.sam = slc.shape[1]
@@ -92,7 +101,7 @@ def create_patch(name):
         count = 0
 
         for dirs in pathObj.list_slv:
-            data_name = pathObj.slave_dir + '/' + dirs + '/' + dirs + '.slc.subset'
+            data_name = pathObj.slave_dir + '/' + dirs + '/' + dirs + '.slc'
             slc = np.memmap(data_name, dtype=np.complex64, mode='r', shape=(pathObj.lin, pathObj.sam))
 
             rslc[count, :, :] = slc[pathObj.patch_rows[0][0][patch_row]:pathObj.patch_rows[1][0][patch_row],

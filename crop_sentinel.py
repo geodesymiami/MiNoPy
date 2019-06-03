@@ -151,11 +151,11 @@ if __name__ == '__main__':
     run_list_geo = []
 
     for item in slc_list:
-        run_list_slc.append((item, item.split('.full')[0] + '.subset'))
+        run_list_slc.append((item, item.split('.full')[0]))
 
     for item in meta_data:
         run_list_geo.append((os.path.join(inps.geo_master, item + '.rdr.full'),
-                                  os.path.join(inps.geo_master, item + '.rdr.subset')))
+                                  os.path.join(inps.geo_master, item + '.rdr')))
 
     futures = []
     start_time = time.time()
@@ -169,3 +169,5 @@ if __name__ == '__main__':
         futures.append(future)
 
     results = dask.compute(*futures)
+
+    print('Done cropping images.')
