@@ -125,6 +125,7 @@ if __name__ == '__main__':
     inps = command_line_parse()
     inps = create_or_update_template(inps)
     inps.geo_master = os.path.join(inps.work_dir, pathObj.geomasterdir)
+    inps.master_dir = os.path.join(inps.work_dir, pathObj.masterdir)
 
     slc_list = os.listdir(os.path.join(inps.work_dir, pathObj.mergedslcdir))
     slc_list = [os.path.join(inps.work_dir, pathObj.mergedslcdir, x, x + '.slc.full') for x in slc_list]
@@ -136,16 +137,17 @@ if __name__ == '__main__':
         raise Exception('Bbox should contain 4 floating point values')
 
     crop_area = np.array(
-        convert_geo2image_coord(inps.geo_master, np.float32(cbox[0]), np.float32(cbox[1]),
+        convert_geo2image_coord(inps.geo_master, inps.master_dir, np.float32(cbox[0]), np.float32(cbox[1]),
                                 np.float32(cbox[2]), np.float32(cbox[3])))
 
-    pathObj.first_row = np.int(crop_area[0])
-    pathObj.last_row = np.int(crop_area[1])
-    pathObj.first_col = np.int(crop_area[2])
-    pathObj.last_col = np.int(crop_area[3])
+    pathObj.first_row = crop_area[0]
+    pathObj.last_row = crop_area[1]
+    pathObj.first_col = crop_area[2]
+    pathObj.last_col = crop_area[3]
 
     pathObj.n_lines = pathObj.last_row - pathObj.first_row
     pathObj.width = pathObj.last_col - pathObj.first_col
+    import pdb; pdb.set_trace()
 
     run_list_slc = []
     run_list_geo = []

@@ -13,11 +13,13 @@ from scipy.optimize import minimize, Bounds
 import gdal
 import isce
 import isceobj
+from mintpy.prep_isce import *
+from mintpy.utils import readfile
 
 ################################################################################
 
 
-def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_east, status='multilook'):
+def convert_geo2image_coord_old(geo_master_dir, lat_south, lat_north, lon_west, lon_east):
     """ Finds the corresponding line and sample based on geographical coordinates. """
 
     ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
@@ -47,8 +49,71 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
 
     image_coord = [first_row, last_row, first_col, last_col]
 
+    return image_coord
+
+
+def convert_geo2image_coord(geo_master_dir, master_dir, lat_south, lat_north, lon_west, lon_east):
+    """ Finds the corresponding line and sample based on geographical coordinates. """
+
+    master_xml = glob.glob(master_dir + '/IW*.xml')[0]
+    metadata = extract_tops_metadata(master_xml)
+    gmeta = extract_geometry_metadata(geo_master_dir + '/lat.rdr.full.xml', metadata)
+    rmeta = readfile.read_isce_xml(geo_master_dir + '/lat.rdr.full.xml')
+
+    # Read Attributes
+    range_n = float(gmeta['startingRange'])
+    dR = float(gmeta['rangePixelSize'])
+    width = int(rmeta['WIDTH'])
+    Re = float(gmeta['earthRadius'])
+    Height = float(gmeta['altitude'])
+    range_f = range_n + dR * width
+    inc_angle_n = (np.pi - np.arccos((Re ** 2 + range_n ** 2 - (Re + Height) ** 2) / (2 * Re * range_n))) * 180.0 / np.pi
+    inc_angle_f = (np.pi - np.arccos((Re ** 2 + range_f ** 2 - (Re + Height) ** 2) / (2 * Re * range_f))) * 180.0 / np.pi
+
+    inc_angle = (inc_angle_n + inc_angle_f) / 2.0
+    rg_step = float(dR) / np.sin(inc_angle / 180.0 * np.pi)
+    az_step = float(gmeta['azimuthPixelSize']) * Re / (Re + Height)
+
+    lat = [lat_south, lat_north]
+    lon = [lon_west, lon_east]
+
+    lat_c = (np.nanmax(lat) + np.nanmin(lat)) / 2.
+    az_step_deg = 180. / np.pi * az_step / (Re)
+    rg_step_deg = 180. / np.pi * rg_step / (Re * np.cos(lat_c * np.pi / 180.))
+
+    y_factor = 10 * az_step_deg
+    x_factor = 10 * rg_step_deg
+
+    ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
+    lut_y = ds.GetRasterBand(1).ReadAsArray()
+
+    ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
+    lut_x = ds.GetRasterBand(1).ReadAsArray()
+
+    rows = []
+    cols = []
+
+    for lat0 in lat:
+        for lon0 in lon:
+            ymin = lat0 - y_factor;   ymax = lat0 + y_factor
+            xmin = lon0 - x_factor;   xmax = lon0 + x_factor
+
+            mask_y = np.multiply(lut_y >= ymin, lut_y <= ymax)
+            mask_x = np.multiply(lut_x >= xmin, lut_x <= xmax)
+            mask_yx = np.multiply(mask_y, mask_x)
+            row, col = np.nanmean(np.where(mask_yx), axis=1)
+            rows.append(row)
+            cols.append(col)
+
+    first_row = np.rint(np.min(rows)).astype(int)
+    last_row = np.rint(np.max(rows)).astype(int)
+    first_col = np.rint(np.min(cols)).astype(int)
+    last_col = np.rint(np.max(cols)).astype(int)
+
+    image_coord = [first_row, last_row, first_col, last_col]
 
     return image_coord
+
 
 ##############################################################################
 
