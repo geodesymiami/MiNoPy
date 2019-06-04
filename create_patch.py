@@ -23,7 +23,7 @@ def main(iargs=None):
         Divides the whole scene into patches for parallel processing
     """
     message_rsmas.log(os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
-    
+
     inps = command_line_parse(iargs)
     inps = create_or_update_template(inps)
     inps.minopy_dir = os.path.join(inps.work_dir, pathObj.minopydir)
@@ -38,7 +38,7 @@ def main(iargs=None):
         os.mkdir(pathObj.int_dir)
 
     pathObj.slave_dir = os.path.join(inps.work_dir, pathObj.mergedslcdir)
-    
+
     pathObj.list_slv = os.listdir(pathObj.slave_dir)
     pathObj.list_slv = [datetime.strptime(x, '%Y%m%d') for x in pathObj.list_slv]
     pathObj.list_slv = np.sort(pathObj.list_slv)
