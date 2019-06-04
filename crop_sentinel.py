@@ -147,7 +147,6 @@ if __name__ == '__main__':
 
     pathObj.n_lines = pathObj.last_row - pathObj.first_row
     pathObj.width = pathObj.last_col - pathObj.first_col
-    import pdb; pdb.set_trace()
 
     run_list_slc = []
     run_list_geo = []

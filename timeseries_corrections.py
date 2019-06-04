@@ -231,7 +231,7 @@ def main(iargs=None):
 
     os.chdir(inps.work_dir)
 
-    app.run(steps=inps.runSteps[5::])
+    app.run(steps=inps.runSteps[4::])
 
     # Timing
     m, s = divmod(time.time()-start_time, 60)
