@@ -17,6 +17,7 @@ from mintpy import smallbaselineApp
 from minsar.utils.process_utilities import get_project_name, get_work_directory
 from minsar.objects.auto_defaults import PathFind
 from mintpy.utils import readfile, utils as ut
+from minsar.objects import message_rsmas
 
 pathObj = PathFind()
 
@@ -74,6 +75,8 @@ def cmd_line_parse(iargs=None):
 
     inps.project_name = get_project_name(inps.customTemplateFile)
     inps.work_dir = os.path.join(get_work_directory(None, inps.project_name), pathObj.mintpydir)
+
+    message_rsmas.log(inps.work_dir, os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
 
     return inps
 

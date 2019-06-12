@@ -10,6 +10,7 @@ import numpy as np
 import cmath
 from numpy import linalg as LA
 from scipy.optimize import minimize, Bounds
+from scipy import stats
 import gdal
 import isce
 import isceobj
@@ -313,9 +314,9 @@ def PTA_L_BFGS(xm):
 def EVD_phase_estimation(coh0):
     """ Estimates the phase values based on eigen value decomosition """
 
-    w, v = LA.eigh(coh0)
-    f = np.where(np.abs(w) == np.sort(np.abs(w))[len(coh0)-1])
-    vec = v[:, f].reshape(len(w),1)
+    Eigen_value, Eigen_vector = LA.eigh(coh0)
+    f = np.where(np.abs(Eigen_value) == np.sort(np.abs(Eigen_value))[len(coh0)-1])
+    vec = Eigen_vector[:, f].reshape(len(Eigen_value), 1)
     x0 = np.angle(vec)
     x0 = x0 - x0[0, 0]
     x0 = np.unwrap(x0, np.pi, axis=0)
@@ -331,16 +332,37 @@ def EMI_phase_estimation(coh0):
     abscoh = regularize_matrix(np.abs(coh0))
     if np.size(abscoh) == np.size(coh0):
         M = np.multiply(LA.pinv(abscoh), coh0)
-        w, v = LA.eigh(M)
-        f = np.where(np.abs(w) == np.sort(np.abs(w))[0])
-        vec = v[:, f[0][0]].reshape(v.shape[0], 1)
-        x0 = np.angle(vec).reshape(len(w), 1)
+        Eigen_value, Eigen_vector = LA.eigh(M)
+        f = np.where(np.abs(Eigen_value) == np.sort(np.abs(Eigen_value))[0])
+        vec = Eigen_vector[:, f[0][0]].reshape(Eigen_vector.shape[0], 1)
+        x0 = np.angle(vec).reshape(len(Eigen_value), 1)
         x0 = x0 - x0[0, 0]
         x0 = np.unwrap(x0, np.pi, axis=0)
         return x0
     else:
         print('warning: coherence matrix not positive semidifinite, It is switched from EMI to EVD')
         return EVD_phase_estimation(coh0)
+
+###############################################################################
+
+
+def test_PS(ccg):
+    """ checks if the pixel is PS """
+
+    coh_mat = est_corr(ccg)
+    Eigen_value, Eigen_vector = LA.eigh(coh_mat)
+    med_w = np.median(Eigen_value)
+    MAD = np.median(np.absolute(Eigen_value - med_w))
+
+    thold1 = np.abs(med_w + 3.5*MAD)
+    thold2 = np.abs(med_w - 3.5*MAD)
+    treshhold = np.max([thold1, thold2])
+    status = len(np.where(np.abs(Eigen_value) > treshhold))
+
+    if status > 0:
+        return True
+    else:
+        return False
 
 ###############################################################################
 
@@ -619,3 +641,12 @@ def sequential_phase_linking(full_stack_complex_samples, method, num_stack=1):
 
     #return phas_refined_no_datum_shift, phas_refined
     return phas_refined
+
+#############################################
+
+
+def create_xml(fname, bands, line, sample, format):
+    from isceobj.Util.ImageUtil import ImageLib as IML
+    rslc = np.memmap(fname, dtype=np.complex64, mode='w+', shape=(bands, line, sample))
+    IML.renderISCEXML(fname, bands, line, sample, format, 'BIL')
+    return rslc

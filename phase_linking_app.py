@@ -12,6 +12,7 @@ import numpy as np
 import minopy_utilities as mnp
 import dask
 import glob
+from minsar.objects import message_rsmas
 import minsar.utils.process_utilities as putils
 from minsar.objects.auto_defaults import PathFind
 import minsar.job_submission as js
@@ -46,6 +47,9 @@ if __name__ == '__main__':
 
     inps = command_line_parse()
     inps = putils.create_or_update_template(inps)
+
+    message_rsmas.log(inps.work_dir, os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
+
     pathObj.minopydir = os.path.join(inps.work_dir, pathObj.minopydir)
     patch_list = glob.glob(pathObj.minopydir + '/PATCH*')
 
@@ -78,11 +82,12 @@ if __name__ == '__main__':
 
     jobs = js.submit_batch_jobs(batch_file=run_minopy_inversion,
                                 out_dir=os.path.join(inps.work_dir, 'run_files'),
-                                memory=memorymax, walltime=walltimelimit, queue=queuename)
+                                work_dir=inps.work_dir, memory=memorymax,
+                                walltime=walltimelimit, queue=queuename)
 
     putils.remove_zero_size_or_length_error_files(run_file=run_minopy_inversion)
     putils.raise_exception_if_job_exited(run_file=run_minopy_inversion)
-    putils.concatenate_error_files(run_file=run_minopy_inversion)
+    putils.concatenate_error_files(run_file=run_minopy_inversion, work_dir=inps.work_dir)
     putils.move_out_job_files_to_stdout(run_file=run_minopy_inversion)
 
 

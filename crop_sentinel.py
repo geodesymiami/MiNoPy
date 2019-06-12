@@ -120,10 +120,11 @@ if __name__ == '__main__':
     '''
     Crop SLCs and geometry.
     '''
-    message_rsmas.log(os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
-    
+
     inps = command_line_parse()
     inps = create_or_update_template(inps)
+    message_rsmas.log(inps.work_dir, os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
+
     inps.geo_master = os.path.join(inps.work_dir, pathObj.geomasterdir)
     inps.master_dir = os.path.join(inps.work_dir, pathObj.masterdir)
 

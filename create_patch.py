@@ -22,10 +22,24 @@ def main(iargs=None):
     """
         Divides the whole scene into patches for parallel processing
     """
-    message_rsmas.log(os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
 
     inps = command_line_parse(iargs)
     inps = create_or_update_template(inps)
+
+    message_rsmas.log(inps.work_dir, os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
+
+    #########################################
+    # Submit job
+    #########################################
+
+    if inps.submit_flag:
+        job_file_name = 'create_patch'
+        work_dir = os.getcwd()
+        job_name = inps.customTemplateFile.split(os.sep)[-1].split('.')[0]
+
+        js.submit_script(job_name, job_file_name, sys.argv[:], work_dir, inps.wall_time)
+        sys.exit(0)
+
     inps.minopy_dir = os.path.join(inps.work_dir, pathObj.minopydir)
     pathObj.patch_dir = inps.minopy_dir + '/PATCH'
 
@@ -72,6 +86,9 @@ def create_parser():
     parser = argparse.ArgumentParser(description='Divides the whole scene into patches for parallel processing')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
     parser.add_argument('customTemplateFile', nargs='?', help='custom template with option settings.\n')
+    parser.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
+    parser.add_argument('--walltime', dest='wall_time', type=str, default='2:00',
+                        help='walltime, e.g. 2:00 (default: 2:00)')
 
     return parser
 
@@ -111,14 +128,13 @@ def create_patch(name):
 
         del rslc
 
-        np.save(patch_name + '/count.npy', [pathObj.n_image,line,sample])
+        np.save(patch_name + '/count.npy', [pathObj.n_image, line, sample])
     else:
         print('Next patch...')
     return print("PATCH" + str(patch_row) + '_' + str(patch_col) + " is created")
 
 
 def submit_dask_job(patch_list, minopy_dir):
-
 
     if os.path.isfile(minopy_dir + '/flag.npy'):
         print('patchlist exist')
