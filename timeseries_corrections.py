@@ -7,6 +7,7 @@
 ######################################################################
 
 import os
+import sys
 import glob
 import time
 import argparse
@@ -74,9 +75,10 @@ def cmd_line_parse(iargs=None):
         inps.customTemplateFile = os.path.abspath(inps.customTemplateFile)
 
     inps.project_name = get_project_name(inps.customTemplateFile)
-    inps.work_dir = os.path.join(get_work_directory(None, inps.project_name), pathObj.mintpydir)
+    inps.project_dir = get_work_directory(None, inps.project_name)
+    inps.work_dir = os.path.join(inps.project_dir, pathObj.mintpydir)
 
-    message_rsmas.log(inps.work_dir, os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
+    message_rsmas.log(inps.project_dir, os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
 
     return inps
 
@@ -215,6 +217,7 @@ def main(iargs=None):
         app.template['mintpy.unwrapError.method'] = 'bridging'
 
     inps.runSteps = ['load_data',
+    'modify_network',
     'reference_point',
     'stack_interferograms',
     'correct_unwrap_error',
@@ -228,13 +231,13 @@ def main(iargs=None):
     'google_earth',
     'hdfeos5']
 
-    app.run(steps=inps.runSteps[0:4])
+    app.run(steps=inps.runSteps[0:5])
 
     write_to_timeseries(inps, app.template)
 
     os.chdir(inps.work_dir)
 
-    app.run(steps=inps.runSteps[4::])
+    app.run(steps=inps.runSteps[5::])
 
     # Timing
     m, s = divmod(time.time()-start_time, 60)

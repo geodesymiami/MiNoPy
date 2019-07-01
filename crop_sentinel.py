@@ -52,7 +52,7 @@ def cropSLC(data):
     inp_file = ds.GetRasterBand(1).ReadAsArray()[pathObj.first_row:pathObj.last_row, pathObj.first_col:pathObj.last_col]
     data_type = inp_file.dtype.type
     del ds
-
+    
     out_map = np.memmap(output_file, dtype=data_type, mode='write', shape=(pathObj.n_lines, pathObj.width))
     out_map[:, :] = inp_file[:, :]
 
@@ -163,13 +163,15 @@ if __name__ == '__main__':
     start_time = time.time()
 
     for item in run_list_slc:
-        future = dask.delayed(cropSLC)(item)
-        futures.append(future)
+        cropSLC(item)
+        #future = dask.delayed(cropSLC)(item)
+        #futures.append(future)
 
     for item in run_list_geo:
-        future = dask.delayed(cropQualitymap)(item)
-        futures.append(future)
+        cropQualitymap(item)
+        #future = dask.delayed(cropQualitymap)(item)
+        #futures.append(future)
 
-    results = dask.compute(*futures)
+    #results = dask.compute(*futures)
 
     print('Done cropping images.')

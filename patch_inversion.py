@@ -68,7 +68,17 @@ class PhaseLink:
         self.coords = list(map(lambda y, x: [int(y), int(x)],
                           lin.T.reshape(self.length * self.width, 1),
                           sam.T.reshape(self.length * self.width, 1)))
-        
+
+        self.sample_rows = np.ogrid[-((self.azimuth_window - 1) / 2):((self.azimuth_window - 1) / 2) + 1]
+        self.sample_rows = self.sample_rows.astype(int)
+        self.reference_row = np.array([(self.azimuth_window - 1) / 2]).astype(int)
+        self.reference_row = self.reference_row - (self.azimuth_window - len(self.sample_rows))
+
+        self.sample_cols = np.ogrid[-((self.range_window - 1) / 2):((self.range_window - 1) / 2) + 1]
+        self.sample_cols = self.sample_cols.astype(int)
+        self.reference_col = np.array([(self.range_window - 1) / 2]).astype(int)
+        self.reference_col = self.reference_col - (self.range_window - len(self.sample_cols))
+
         self.rslc = np.memmap(self.patch_dir + '/RSLC', dtype=np.complex64, mode='r',
                                  shape=(self.n_image, self.length, self.width))
 
@@ -90,11 +100,11 @@ class PhaseLink:
 
         time0 = time.time()
 
-        futures = []
         for coord in self.coords:
-            futures.append(dask.delayed(self.get_shp_row_col)(coord))
-
-        results = dask.compute(*futures)
+            if not self.shp[:, coord[0], coord[1]].any():
+                self.get_shp_row_col(coord)
+            else:
+                print('coord {} done before'.format(coord))
 
         timep = time.time() - time0
 
@@ -104,55 +114,43 @@ class PhaseLink:
 
     def get_shp_row_col(self, data):
 
-        if self.shp[:, data[0], data[1]].all() == 0:
+        # print(data)
 
-            print(data)
+        row_0, col_0 = data
 
-            row_0, col_0 = data
+        sample_rows = row_0 + self.sample_rows
+        sample_rows[sample_rows < 0] = -1
+        sample_rows[sample_rows >= self.length] = -1
 
-            sample_rows = np.ogrid[row_0 - ((self.azimuth_window - 1) / 2):row_0 + ((self.azimuth_window - 1) / 2) + 1]
-            sample_rows = sample_rows.astype(int)
-            sample_rows[sample_rows < 0] = -1
-            sample_rows[sample_rows >= self.length] = -1
-            reference_row = np.array([(self.azimuth_window - 1) / 2]).astype(int)
-            reference_row = reference_row - (self.azimuth_window - len(sample_rows))
+        sample_cols = col_0 + self.sample_cols
+        sample_cols[sample_cols < 0] = -1
+        sample_cols[sample_cols >= self.width] = -1
 
-            sample_cols = np.ogrid[col_0 - ((self.range_window - 1) / 2):col_0 + ((self.range_window - 1) / 2) + 1]
-            sample_cols = sample_cols.astype(int)
-            sample_cols[sample_cols < 0] = -1
-            sample_cols[sample_cols >= self.width] = -1
-            reference_col = np.array([(self.range_window - 1) / 2]).astype(int)
-            reference_col = reference_col - (self.range_window - len(sample_cols))
+        x, y = np.meshgrid(sample_cols.astype(int), sample_rows.astype(int), sparse=False)
 
-            x, y = np.meshgrid(sample_cols.astype(int), sample_rows.astype(int), sparse=False)
+        win = np.abs(self.rslc[0:self.num_slc, y, x])
+        testvec = win.reshape(self.num_slc, self.azimuth_window * self.range_window)
+        adres = np.zeros(self.azimuth_window * self.range_window).astype(int)
 
-            win = np.abs(self.rslc[0:self.num_slc, y, x])
-            testvec = win.reshape(self.num_slc, self.azimuth_window * self.range_window)
-            adres = np.zeros(self.azimuth_window * self.range_window).astype(int)
+        S1 = np.abs(self.rslc[0:self.num_slc, row_0, col_0])
+        S1 = S1.flatten()
 
-            S1 = np.abs(self.rslc[0:self.num_slc, row_0, col_0])
-            S1 = S1.flatten()
+        x = x.flatten()
+        y = y.flatten()
 
-            x = x.flatten()
-            y = y.flatten()
+        for m in range(testvec.shape[1]):
+            if x[m] >= 0 and y[m] >= 0:
+                S2 = testvec[:, m]
+                S2 = S2.flatten()
 
-            for m in range(len(testvec[0])):
-                if x[m] >= 0 and y[m] >= 0:
-                    S2 = testvec[:, m]
-                    S2 = S2.flatten()
+                try:
+                    test = anderson_ksamp([S1, S2])
+                    if test.significance_level > 0.05:
+                        adres[m] = 1
+                except:
+                    adres[m] = 0
 
-                    try:
-                        test = anderson_ksamp([S1, S2])
-                        if test.significance_level > 0.05:
-                            adres[m] = 1
-                    except:
-                        adres[m] = 0
-
-            ad_res = adres.reshape(self.azimuth_window, self.range_window).astype(int)
-            ad_label = label(ad_res, background=False, connectivity=2)
-            ref_label = ad_label[reference_row.astype(int), reference_col.astype(int)]
-            ad_label = 1 * (ad_label == ref_label)
-            self.shp[:, row_0, col_0] = ad_label.flatten()
+        self.shp[:, row_0:row_0 + 1, col_0:col_0 + 1] = adres.reshape(len(adres), 1, 1)
 
         return
 
@@ -174,6 +172,8 @@ class PhaseLink:
 
         self.progress[ref_row:ref_row + 1, ref_col:ref_col + 1] = 1
 
+        # print(ref_row, ref_col, 'DS')
+
         return None
 
     def inversion_all(self, data):
@@ -193,6 +193,8 @@ class PhaseLink:
 
         self.progress[ref_row:ref_row + 1, ref_col:ref_col + 1] = 1
 
+        # print(ref_row, ref_col, 'DS')
+
         return None
 
     def filter_persistent_scatterer(self, data):
@@ -207,6 +209,7 @@ class PhaseLink:
         if status:
             data_invert = (ref_row, ref_col, shp_rows, shp_cols, 'EMI')
             self.inversion_all(data_invert)
+            # print(ref_row, ref_col, 'PS')
 
         return None
 
@@ -229,7 +232,7 @@ class PhaseLink:
             self.progress = np.memmap(inps.patch + '/progress', dtype='int8', mode='r+',
                                          shape=(self.length, self.width))
 
-        futures = []
+        # futures = []
 
         time0 = time.time()
 
@@ -242,16 +245,19 @@ class PhaseLink:
 
             if num_shp < 20:
                 data = (coord[0], coord[1], shp_rows, shp_cols)
-                futures.append(dask.delayed(self.filter_persistent_scatterer)(data))
+                self.filter_persistent_scatterer(data)
+                # futures.append(dask.delayed(self.filter_persistent_scatterer)(data))
             else:
                 data = (coord[0], coord[1], shp_rows, shp_cols, self.phase_linking_method)
 
                 if 'sequential' in self.phase_linking_method:
-                    futures.append(dask.delayed(self.inversion_sequential)(data))
+                    self.inversion_sequential(data)
+                    # futures.append(dask.delayed(self.inversion_sequential)(data))
                 else:
-                    futures.append(dask.delayed(self.inversion_all)(data))
+                    self.inversion_all(data)
+                    # futures.append(dask.delayed(self.inversion_all)(data))
 
-        results = dask.compute(*futures)
+        # results = dask.compute(*futures)
 
         timep = time.time() - time0
         print('time spent to do phase linking {}: min'.format(timep / 60))
