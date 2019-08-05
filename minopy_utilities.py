@@ -8,6 +8,7 @@ import sys
 import os
 import numpy as np
 import cmath
+import argparse
 from numpy import linalg as LA
 from scipy.optimize import minimize, Bounds
 from scipy import stats
@@ -16,6 +17,79 @@ import isce
 import isceobj
 from mintpy.prep_isce import *
 from mintpy.utils import readfile
+from minsar.objects.auto_defaults import PathFind
+import minsar.utils.process_utilities as putils
+pathObj = PathFind()
+################################################################################
+
+
+def cmd_line_parse(iargs=None, script=None):
+
+    parser = argparse.ArgumentParser(description='MiNoPy scripts common parser')
+    parser.add_argument('customTemplateFile', nargs='?', help='custom template with option settings.\n')
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
+    parser.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
+    parser.add_argument('--walltime', dest='wall_time', default='None',
+                        help='walltime for submitting the script as a job')
+
+    if script == 'minopy_wrapper':
+        parser = add_minopy_wrapper(parser)
+    if script == 'patch_inversion':
+        parser = add_patch_inversion(parser)
+    if script == 'timeseries_corrections':
+        parser = add_mintpy_corrections(parser)
+
+    inps = parser.parse_args(args=iargs)
+    inps = putils.create_or_update_template(inps)
+
+    return inps
+
+
+def add_minopy_wrapper(parser):
+
+    STEP_LIST, STEP_HELP = pathObj.minopy_help()
+
+    mnp = parser.add_argument_group('MiNoPy Routine InSAR Time Series Analysis. steps processing '
+                                    '(start/end/step)', STEP_HELP)
+    mnp.add_argument('--remove_minopy_dir', dest='remove_minopy_dir', action='store_true',
+                     help='remove directory before download starts')
+    mnp.add_argument('--start', dest='startStep', metavar='STEP', default=STEP_LIST[0],
+                      help='start processing at the named step, default: {}'.format(STEP_LIST[0]))
+    mnp.add_argument('--stop', dest='endStep', metavar='STEP', default=STEP_LIST[-1],
+                      help='end processing at the named step, default: {}'.format(STEP_LIST[-1]))
+    mnp.add_argument('--step', dest='step', metavar='STEP',
+                      help='run processing at the named step only')
+
+    return parser
+
+
+def add_patch_inversion(parser):
+
+    pi = parser.add_argument_group('Patch inversion option')
+    pi.add_argument('-p', '--patch', type=str, dest='patch', help='patch directory')
+
+    return parser
+
+
+def add_mintpy_corrections(parser):
+
+    corrections = parser.add_argument_group('Mintpy options')
+
+    corrections.add_argument('--dir', dest='work_dir',
+                        help='MintPy working directory, default is:\n' +
+                             'a) current directory, or\n' +
+                             'b) $SCRATCHDIR/projectName/mintpy, if meets the following 3 requirements:\n' +
+                             '    1) autoPath = True in mintpy/defaults/auto_path.py\n' +
+                             '    2) environmental variable $SCRATCHDIR exists\n' +
+                             '    3) input custom template with basename same as projectName\n')
+    corrections.add_argument('-g', dest='generate_template', action='store_true',
+                        help='Generate default template (and merge with custom template), then exit.')
+    corrections.add_argument('-H', dest='print_auto_template', action='store_true',
+                        help='Print/Show the example template file for routine processing.')
+    corrections.add_argument('--version', action='store_true', help='print version number')
+
+    return parser
+
 
 ################################################################################
 

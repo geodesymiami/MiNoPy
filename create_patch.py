@@ -23,10 +23,11 @@ def main(iargs=None):
         Divides the whole scene into patches for parallel processing
     """
 
-    inps = command_line_parse(iargs)
-    inps = create_or_update_template(inps)
+    inps = mnp.cmd_line_parse(iargs)
 
     message_rsmas.log(inps.work_dir, os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
+
+    config = putils.get_config_defaults(config_file='job_defaults.cfg')
 
     #########################################
     # Submit job
@@ -36,6 +37,9 @@ def main(iargs=None):
         job_file_name = 'create_patch'
         work_dir = os.getcwd()
         job_name = inps.customTemplateFile.split(os.sep)[-1].split('.')[0]
+
+        if inps.wall_time == 'None':
+            inps.wall_time = config[job_file_name]['walltime']
 
         js.submit_script(job_name, job_file_name, sys.argv[:], work_dir, inps.wall_time)
         sys.exit(0)
@@ -79,26 +83,6 @@ def main(iargs=None):
     submit_dask_job(inps.patch_list, inps.minopy_dir)
 
     return
-
-
-def create_parser():
-    """ Creates command line argument parser object. """
-    parser = argparse.ArgumentParser(description='Divides the whole scene into patches for parallel processing')
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
-    parser.add_argument('customTemplateFile', nargs='?', help='custom template with option settings.\n')
-    parser.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
-    parser.add_argument('--walltime', dest='wall_time', type=str, default='2:00',
-                        help='walltime, e.g. 2:00 (default: 2:00)')
-
-    return parser
-
-
-def command_line_parse(args):
-    """ Parses command line agurments into inps variable. """
-
-    parser = create_parser()
-    inps = parser.parse_args(args)
-    return inps
 
 
 def create_patch(name):

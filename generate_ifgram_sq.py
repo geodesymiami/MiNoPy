@@ -177,7 +177,6 @@ def main(iargs=None):
         estCoherence(outputint, corfile)
 
 
-
 if __name__ == '__main__':
     """
         Overwrite filtered SLC images.

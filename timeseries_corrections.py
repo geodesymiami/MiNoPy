@@ -19,48 +19,35 @@ from minsar.utils.process_utilities import get_project_name, get_work_directory
 from minsar.objects.auto_defaults import PathFind
 from mintpy.utils import readfile, utils as ut
 from minsar.objects import message_rsmas
+import minopy_utilities as mnp
 
 pathObj = PathFind()
 
 ##########################################################################
 
-EXAMPLE = """example:
-  timeseries_corrections.py                                             #Run / Rerun
-  
-  # Template options
-  timeseries_corrections.py -H                               #Print    default template
-  timeseries_corrections.py -g                               #Generate default template
-  timeseries_corrections.py -g SanAndreasT356EnvD.template   #Generate default template considering input custom template
-"""
 
+def main(iargs=None):
+    
+    start_time = time.time()
+    inps = mnp.cmd_line_parse(iargs, script='timeseries_corrections')
 
-def create_parser():
-    parser = argparse.ArgumentParser(description='MintPy Phase Linking and Time Series Analysis',
-                                     formatter_class=argparse.RawTextHelpFormatter,
-                                     epilog=EXAMPLE)
+    config = putils.get_config_defaults(config_file='job_defaults.cfg')
 
-    parser.add_argument('customTemplateFile', nargs='?', help='custom template with option settings\n')
-    parser.add_argument('--dir', dest='work_dir',
-                        help='MintPy working directory, default is:\n' +
-                             'a) current directory, or\n' +
-                             'b) $SCRATCHDIR/projectName/mintpy, if meets the following 3 requirements:\n' +
-                             '    1) autoPath = True in mintpy/defaults/auto_path.py\n' +
-                             '    2) environmental variable $SCRATCHDIR exists\n' +
-                             '    3) input custom template with basename same as projectName\n')
-    parser.add_argument('-g', dest='generate_template', action='store_true',
-                        help='Generate default template (and merge with custom template), then exit.')
-    parser.add_argument('-H', dest='print_auto_template', action='store_true',
-                        help='Print/Show the example template file for routine processing.')
-    parser.add_argument('--version', action='store_true', help='print version number')
+    #########################################
+    # Submit job
+    #########################################
 
+    if inps.submit_flag:
+        job_file_name = 'timeseries_corrections'
+        work_dir = os.getcwd()
+        job_name = inps.customTemplateFile.split(os.sep)[-1].split('.')[0]
 
-    return parser
+        if inps.wall_time == 'None':
+            inps.wall_time = config[job_file_name]['walltime']
 
+        js.submit_script(job_name, job_file_name, sys.argv[:], work_dir, inps.wall_time)
+        sys.exit(0)
 
-def cmd_line_parse(iargs=None):
-    """Command line parser."""
-    parser = create_parser()
-    inps = parser.parse_args(args=iargs)
     inps.autoTemplateFile = os.path.join(os.getenv('MINTPY_HOME'), 'defaults/smallbaselineApp_auto.cfg')
 
     if inps.print_auto_template:
@@ -80,9 +67,28 @@ def cmd_line_parse(iargs=None):
 
     message_rsmas.log(inps.project_dir, os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
 
-    return inps
+    app = smallbaselineApp.TimeSeriesAnalysis(inps.customTemplateFile, inps.work_dir)
+    app.startup()
 
-###############################
+    if app.template['mintpy.unwrapError.method']:
+        app.template['mintpy.unwrapError.method'] = 'bridging'
+
+    inps.runSteps = pathObj.minopy_corrections()
+
+    app.run(steps=inps.runSteps[0:5])
+
+    write_to_timeseries(inps, app.template)
+
+    os.chdir(inps.work_dir)
+
+    app.run(steps=inps.runSteps[5::])
+
+    # Timing
+    m, s = divmod(time.time()-start_time, 60)
+    print('\nTotal time: {:02.0f} mins {:02.1f} secs'.format(m, s))
+    return
+
+###########################################################################################
 
 
 def get_phase_linking_coherence_mask(inps, template):
@@ -207,44 +213,5 @@ def write_to_timeseries(inps, template):
 ##########################
 
 
-def main(iargs=None):
-    start_time = time.time()
-    inps = cmd_line_parse(iargs)
-    app = smallbaselineApp.TimeSeriesAnalysis(inps.customTemplateFile, inps.work_dir)
-    app.startup()
-
-    if app.template['mintpy.unwrapError.method']:
-        app.template['mintpy.unwrapError.method'] = 'bridging'
-
-    inps.runSteps = ['load_data',
-    'modify_network',
-    'reference_point',
-    'stack_interferograms',
-    'correct_unwrap_error',
-    'correct_troposphere',
-    'deramp',
-    'correct_topography',
-    'residual_RMS',
-    'reference_date',
-    'velocity',
-    'geocode',
-    'google_earth',
-    'hdfeos5']
-
-    app.run(steps=inps.runSteps[0:5])
-
-    write_to_timeseries(inps, app.template)
-
-    os.chdir(inps.work_dir)
-
-    app.run(steps=inps.runSteps[5::])
-
-    # Timing
-    m, s = divmod(time.time()-start_time, 60)
-    print('\nTotal time: {:02.0f} mins {:02.1f} secs'.format(m, s))
-    return
-
-
-###########################################################################################
 if __name__ == '__main__':
     main()

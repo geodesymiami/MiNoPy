@@ -24,7 +24,7 @@ def main(iargs=None):
     """
         Divides the whole scene into patches for parallel processing
     """
-    message_rsmas.log(os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
+    message_rsmas.log('.', os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
 
     inps = command_line_parse(iargs)
     inps = create_or_update_template(inps)
