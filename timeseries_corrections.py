@@ -8,16 +8,16 @@
 
 import os
 import sys
-import glob
 import time
 import argparse
 import numpy as np
 import gdal
 import mintpy
-from mintpy import smallbaselineApp
-from minsar.utils.process_utilities import get_project_name, get_work_directory
-from minsar.objects.auto_defaults import PathFind
+import mintpy.workflow
 from mintpy.utils import readfile, utils as ut
+import minsar.job_submission as js
+from minsar.utils.process_utilities import get_project_name, get_work_directory, add_pause_to_walltime
+from minsar.objects.auto_defaults import PathFind
 from minsar.objects import message_rsmas
 import minopy_utilities as mnp
 
@@ -27,26 +27,34 @@ pathObj = PathFind()
 
 
 def main(iargs=None):
-    
+
     start_time = time.time()
     inps = mnp.cmd_line_parse(iargs, script='timeseries_corrections')
 
     config = putils.get_config_defaults(config_file='job_defaults.cfg')
+
+    job_file_name = 'timeseries_corrections'
+    job_name = job_file_name
+
+    if inps.wall_time == 'None':
+        inps.wall_time = config[job_file_name]['walltime']
+
+    wait_seconds, new_wall_time = add_pause_to_walltime(inps.wall_time, inps.wait_time)
 
     #########################################
     # Submit job
     #########################################
 
     if inps.submit_flag:
-        job_file_name = 'timeseries_corrections'
+
         work_dir = os.getcwd()
-        job_name = inps.customTemplateFile.split(os.sep)[-1].split('.')[0]
 
-        if inps.wall_time == 'None':
-            inps.wall_time = config[job_file_name]['walltime']
-
-        js.submit_script(job_name, job_file_name, sys.argv[:], work_dir, inps.wall_time)
+        js.submit_script(job_name, job_file_name, sys.argv[:], work_dir, new_wall_time)
         sys.exit(0)
+
+    time.sleep(wait_seconds)
+
+    message_rsmas.log(inps.work_dir, os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
 
     inps.autoTemplateFile = os.path.join(os.getenv('MINTPY_HOME'), 'defaults/smallbaselineApp_auto.cfg')
 
@@ -63,11 +71,9 @@ def main(iargs=None):
 
     inps.project_name = get_project_name(inps.customTemplateFile)
     inps.project_dir = get_work_directory(None, inps.project_name)
-    inps.work_dir = os.path.join(inps.project_dir, pathObj.mintpydir)
+    inps.mintpy_dir = os.path.join(inps.project_dir, pathObj.mintpydir)
 
-    message_rsmas.log(inps.project_dir, os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
-
-    app = smallbaselineApp.TimeSeriesAnalysis(inps.customTemplateFile, inps.work_dir)
+    app = mintpy.smallbaselineApp.TimeSeriesAnalysis(inps.customTemplateFile, inps.mintpy_dir)
     app.startup()
 
     if app.template['mintpy.unwrapError.method']:
@@ -79,7 +85,7 @@ def main(iargs=None):
 
     write_to_timeseries(inps, app.template)
 
-    os.chdir(inps.work_dir)
+    os.chdir(inps.mintpy_dir)
 
     app.run(steps=inps.runSteps[5::])
 
@@ -94,9 +100,9 @@ def main(iargs=None):
 def get_phase_linking_coherence_mask(inps, template):
     """Generate reliable pixel mask from temporal coherence"""
 
-    geom_file = ut.check_loaded_dataset(inps.work_dir, print_msg=False)[2]
-    tcoh_file = os.path.join(inps.work_dir, 'temporalCoherence.h5')
-    mask_file = os.path.join(inps.work_dir, 'maskTempCoh.h5')
+    geom_file = ut.check_loaded_dataset(inps.mintpy_dir, print_msg=False)[2]
+    tcoh_file = os.path.join(inps.mintpy_dir, 'temporalCoherence.h5')
+    mask_file = os.path.join(inps.mintpy_dir, 'maskTempCoh.h5')
     tcoh_min = 0.4
 
     scp_args = '{} -m {} -o {} --shadow {}'.format(tcoh_file, tcoh_min, mask_file, geom_file)
@@ -141,13 +147,13 @@ def write_to_timeseries(inps, template):
     from mintpy.objects import ifgramStack, timeseries
     from mintpy.ifgram_inversion import write2hdf5_file, read_unwrap_phase, mask_unwrap_phase
 
-    inps.timeseriesFile = os.path.join(inps.work_dir, 'timeseries.h5')
-    inps.tempCohFile = os.path.join(inps.work_dir, 'temporalCoherence.h5')
-    inps.timeseriesFiles = [os.path.join(inps.work_dir, 'timeseries.h5')]       #all ts files
-    inps.outfile = [os.path.join(inps.work_dir, 'timeseries.h5'),
-                    os.path.join(inps.work_dir, 'temporalCoherence.h5')]
+    inps.timeseriesFile = os.path.join(inps.mintpy_dir, 'timeseries.h5')
+    inps.tempCohFile = os.path.join(inps.mintpy_dir, 'temporalCoherence.h5')
+    inps.timeseriesFiles = [os.path.join(inps.mintpy_dir, 'timeseries.h5')]       #all ts files
+    inps.outfile = [os.path.join(inps.mintpy_dir, 'timeseries.h5'),
+                    os.path.join(inps.mintpy_dir, 'temporalCoherence.h5')]
 
-    ifgram_file = os.path.join(inps.work_dir, 'inputs/ifgramStack.h5')
+    ifgram_file = os.path.join(inps.mintpy_dir, 'inputs/ifgramStack.h5')
     stack_obj = ifgramStack(ifgram_file)
     stack_obj.open(print_msg=False)
     date_list = stack_obj.get_date_list(dropIfgram=True)

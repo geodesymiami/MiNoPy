@@ -2,19 +2,19 @@
 ############################################################
 # Copyright(c) 2017, Sara Mirzaee                          #
 ############################################################
-import numpy as np
+
 import os
 import sys
 import gdal
 import argparse
-import shutil
+import numpy as np
 import isce
 import isceobj
 import time
-import glob
+import minsar.job_submission as js
 from minsar.objects import message_rsmas
+from minsar.utils.process_utilities import add_pause_to_walltime
 from isceobj.Util.ImageUtil import ImageLib as IML
-from mergeBursts import multilook
 import minopy_utilities as mnp
 from minsar.objects.auto_defaults import PathFind
 import dask
@@ -29,24 +29,29 @@ def main(iargs=None):
     '''
 
     inps = mnp.cmd_line_parse(iargs)
-    message_rsmas.log(inps.work_dir, os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
 
     config = putils.get_config_defaults(config_file='job_defaults.cfg')
+
+    job_file_name = 'crop_sentinel'
+    job_name = job_file_name
+
+    if inps.wall_time == 'None':
+        inps.wall_time = config[job_file_name]['walltime']
+
+    wait_seconds, new_wall_time = add_pause_to_walltime(inps.wall_time, inps.wait_time)
 
     #########################################
     # Submit job
     #########################################
 
     if inps.submit_flag:
-        job_file_name = 'crop_sentinel'
 
-        if inps.wall_time == 'None':
-            inps.wall_time = config[job_file_name]['walltime']
-
-        job_name = inps.customTemplateFile.split(os.sep)[-1].split('.')[0]
-
-        js.submit_script(job_name, job_file_name, sys.argv[:], inp.work_dir, inps.wall_time)
+        js.submit_script(job_name, job_file_name, sys.argv[:], inp.work_dir, new_wall_time)
         sys.exit(0)
+
+    time.sleep(wait_seconds)
+
+    message_rsmas.log(inps.work_dir, os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1::]))
 
     inps.geo_master = os.path.join(inps.work_dir, pathObj.geomasterdir)
     inps.master_dir = os.path.join(inps.work_dir, pathObj.masterdir)

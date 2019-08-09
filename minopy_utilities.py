@@ -24,16 +24,11 @@ pathObj = PathFind()
 
 
 def cmd_line_parse(iargs=None, script=None):
+    """Command line parser."""
 
-    parser = argparse.ArgumentParser(description='MiNoPy scripts common parser')
-    parser.add_argument('customTemplateFile', nargs='?', help='custom template with option settings.\n')
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
-    parser.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
-    parser.add_argument('--walltime', dest='wall_time', default='None',
-                        help='walltime for submitting the script as a job')
+    parser = argparse.ArgumentParser(description='MiNoPy scripts parser')
+    parser = add_common_parser(parser)
 
-    if script == 'minopy_wrapper':
-        parser = add_minopy_wrapper(parser)
     if script == 'patch_inversion':
         parser = add_patch_inversion(parser)
     if script == 'timeseries_corrections':
@@ -43,6 +38,19 @@ def cmd_line_parse(iargs=None, script=None):
     inps = putils.create_or_update_template(inps)
 
     return inps
+
+
+def add_common_parser(parser):
+
+    commonp = parser.add_argument_group('General options:')
+    commonp.add_argument('customTemplateFile', nargs='?', help='custom template with option settings.\n')
+    commonp.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
+    commonp.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
+    commonp.add_argument('--walltime', dest='wall_time', default='None',
+                        help='walltime for submitting the script as a job')
+    commonp.add_argument('--wait', dest='wait_time', default='00:00', metavar="Wait time (hh:mm)",
+                         help="wait time to submit a job")
+    return parser
 
 
 def add_minopy_wrapper(parser):
@@ -86,7 +94,6 @@ def add_mintpy_corrections(parser):
                         help='Generate default template (and merge with custom template), then exit.')
     corrections.add_argument('-H', dest='print_auto_template', action='store_true',
                         help='Print/Show the example template file for routine processing.')
-    corrections.add_argument('--version', action='store_true', help='print version number')
 
     return parser
 
