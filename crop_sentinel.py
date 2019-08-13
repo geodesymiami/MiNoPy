@@ -13,9 +13,9 @@ import isceobj
 import time
 import minsar.job_submission as js
 from minsar.objects import message_rsmas
-from minsar.utils.process_utilities import add_pause_to_walltime
+from minsar.utils.process_utilities import add_pause_to_walltime, get_config_defaults
 from isceobj.Util.ImageUtil import ImageLib as IML
-import minopy_utilities as mnp
+from minopy_utilities import cmd_line_parse, convert_geo2image_coord
 from minsar.objects.auto_defaults import PathFind
 import dask
 
@@ -28,9 +28,9 @@ def main(iargs=None):
     Crop SLCs and geometry.
     '''
 
-    inps = mnp.cmd_line_parse(iargs)
+    inps = cmd_line_parse(iargs)
 
-    config = putils.get_config_defaults(config_file='job_defaults.cfg')
+    config = get_config_defaults(config_file='job_defaults.cfg')
 
     job_file_name = 'crop_sentinel'
     job_name = job_file_name
@@ -46,7 +46,7 @@ def main(iargs=None):
 
     if inps.submit_flag:
 
-        js.submit_script(job_name, job_file_name, sys.argv[:], inp.work_dir, new_wall_time)
+        js.submit_script(job_name, job_file_name, sys.argv[:], inps.work_dir, new_wall_time)
         sys.exit(0)
 
     time.sleep(wait_seconds)
@@ -61,13 +61,17 @@ def main(iargs=None):
 
     meta_data = pathObj.get_geom_master_lists()
 
+    if inps.template['minopy.subset'] == 'None':
+        print('WARNING: No crop area given in minopy.subset, the whole image is going to be used.')
+        print('WARNING: May take days to process!')
+
     cbox = [val for val in inps.cropbox.split()]
+
     if len(cbox) != 4:
         raise Exception('Bbox should contain 4 floating point values')
 
-    crop_area = np.array(
-        mnp.convert_geo2image_coord(inps.geo_master, inps.master_dir, np.float32(cbox[0]), np.float32(cbox[1]),
-                                np.float32(cbox[2]), np.float32(cbox[3])))
+    crop_area = np.array(convert_geo2image_coord(inps.geo_master, np.float32(cbox[0]),
+                                                 np.float32(cbox[1]), np.float32(cbox[2]), np.float32(cbox[3])))
 
     pathObj.first_row = crop_area[0]
     pathObj.last_row = crop_area[1]
@@ -86,7 +90,6 @@ def main(iargs=None):
     for item in meta_data:
         run_list_geo.append((os.path.join(inps.geo_master, item + '.rdr.full'),
                                   os.path.join(inps.geo_master, item + '.rdr')))
-
 
     for item in run_list_slc:
         cropSLC(item)
@@ -114,7 +117,7 @@ def cropSLC(data):
     out_map = np.memmap(output_file, dtype=data_type, mode='write', shape=(pathObj.n_lines, pathObj.width))
     out_map[:, :] = inp_file[:, :]
 
-    IML.renderISCEXML(output_file, 1, pathObj.n_lines, pathObj.width, IML.NUMPY_type(str(inp_file.dtype)), 'BIL')
+    renderISCEXML(output_file, 1, pathObj.n_lines, pathObj.width, IML.NUMPY_type(str(inp_file.dtype)), 'BIL')
 
     out_img = isceobj.createSlcImage()
     out_img.load(output_file + '.xml')
@@ -178,6 +181,49 @@ def cropQualitymap(data):
     return output_file
 
 ##############################################################################
+
+def renderISCEXML(fname, bands, nyy, nxx, datatype, scheme,
+                  bbox=None, descr=None):
+    '''
+    Renders an ISCE XML with the right information.
+    '''
+
+    try:
+        import isce
+        import isceobj
+    except:
+        raise ImportError('ISCE has not been installed or is not importable.')
+
+    img = isceobj.createImage()
+    img.filename = fname
+    img.scheme = scheme
+    img.width = nxx
+    img.length = nyy
+    try:
+        img.dataType = isceTypeDict[datatype]
+    except:
+        try:
+            img.dataType = isceTypeDict[NUMPY_type(datatype)]
+        except:
+            raise Exception(
+                'Processing complete but ISCE XML not written as the data type is currently not supported by ISCE Image Api')
+
+    if bbox is not None:
+        img.setFirstLatitude(bbox[0])
+        img.setFirstLongitude(bbox[1])
+        img.setDeltaLatitude(bbox[2])
+        img.setDeltaLongitude(bbox[3])
+
+    if descr is not None:
+        img.addDescription(descr)
+
+    img.bands = bands
+    img.renderVRT()  ###PSA - needed since all reading is now via VRTs
+    img.setAccessMode('read')
+    img.createImage()
+    img.finalizeImage()
+    img.renderHdr()
+    return
 
 
 if __name__ == '__main__':
