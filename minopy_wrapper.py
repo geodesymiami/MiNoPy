@@ -5,17 +5,17 @@
 
 import os
 import sys
-import glob
 import argparse
 import time
 import minopy
 import minopy.workflow
-import minopy_utilities as mnp
+import minopy.minopy_utilities as mnp
 from minsar.objects import message_rsmas
 from minsar.objects.auto_defaults import PathFind
 import minsar.utils.process_utilities as putils
 from minsar import email_results
 import minsar.job_submission as js
+from minsar.utils.stack_run import CreateRun
 
 pathObj = PathFind()
 
@@ -128,6 +128,7 @@ class NoLI:
     """
 
     def __init__(self, inps):
+        self.inps = inps
         self.customTemplateFile = inps.customTemplateFile
         self.work_dir = inps.work_dir
         self.run_dir = os.path.join(inps.work_dir, pathObj.rundir)
@@ -158,32 +159,48 @@ class NoLI:
         """ Export single master interferograms
         """
         run_file_int = os.path.join(self.run_dir, 'run_single_master_interferograms')
-        step_name = 'single_master_interferograms'
-        try:
-            memorymax = config[step_name]['memory']
-        except:
-            memorymax = config['DEFAULT']['memory']
+        if not os.path.exists(run_file_int):
+            inps = self.inps
+            inps.topsStack_template = pathObj.correct_for_isce_naming_convention(inps)
+            runObj = CreateRun(inps)
+            runObj.run_post_stack()
 
-        try:
-            if config[step_name]['adjust'] == 'True':
-                walltimelimit = putils.walltime_adjust(inps, config[step_name]['walltime'])
-            else:
-                walltimelimit = config[step_name]['walltime']
-        except:
-            walltimelimit = config['DEFAULT']['walltime']
+        if os.getenv('JOBSCHEDULER') == 'LSF' or os.getenv('JOBSCHEDULER') == 'PBS':
 
-        queuename = os.getenv('QUEUENAME')
+            step_name = 'single_master_interferograms'
+            try:
+                memorymax = config[step_name]['memory']
+            except:
+                memorymax = config['DEFAULT']['memory']
 
-        putils.remove_last_job_running_products(run_file=run_file_int)
+            try:
+                if config[step_name]['adjust'] == 'True':
+                    walltimelimit = putils.walltime_adjust(inps, config[step_name]['walltime'])
+                else:
+                    walltimelimit = config[step_name]['walltime']
+            except:
+                walltimelimit = config['DEFAULT']['walltime']
 
-        jobs = js.submit_batch_jobs(batch_file=run_file_int, out_dir=self.run_dir,
-                                    work_dir=self.work_dir, memory=memorymax, walltime=walltimelimit,
-                                    queue=queuename)
+            queuename = os.getenv('QUEUENAME')
 
-        putils.remove_zero_size_or_length_error_files(run_file=run_file_int)
-        putils.raise_exception_if_job_exited(run_file=run_file_int)
-        putils.concatenate_error_files(run_file=run_file_int, work_dir=self.work_dir)
-        putils.move_out_job_files_to_stdout(run_file=run_file_int)
+            putils.remove_last_job_running_products(run_file=run_file_int)
+
+            jobs = js.submit_batch_jobs(batch_file=run_file_int, out_dir=self.run_dir,
+                                        work_dir=self.work_dir, memory=memorymax, walltime=walltimelimit,
+                                        queue=queuename)
+
+            putils.remove_zero_size_or_length_error_files(run_file=run_file_int)
+            putils.raise_exception_if_job_exited(run_file=run_file_int)
+            putils.concatenate_error_files(run_file=run_file_int, work_dir=self.work_dir)
+            putils.move_out_job_files_to_stdout(run_file=run_file_int)
+        
+
+        else:
+            with open(run_file_int, 'r') as f:
+                command_lines = f.readlines()
+                for command_line in command_lines:
+                    print(command_line)
+                    os.system(command_line)
 
         return
 
@@ -191,32 +208,48 @@ class NoLI:
         """ Unwrapps single master interferograms
         """
         run_file_int = os.path.join(self.run_dir, 'run_unwrap')
-        step_name = 'unwrap'
-        try:
-            memorymax = config[step_name]['memory']
-        except:
-            memorymax = config['DEFAULT']['memory']
 
-        try:
-            if config[step_name]['adjust'] == 'True':
-                walltimelimit = putils.walltime_adjust(inps, config[step_name]['walltime'])
-            else:
-                walltimelimit = config[step_name]['walltime']
-        except:
-            walltimelimit = config['DEFAULT']['walltime']
+        if not os.path.exists(run_file_int):
+            inps = self.inps
+            inps.topsStack_template = pathObj.correct_for_isce_naming_convention(inps)
+            runObj = CreateRun(inps)
+            runObj.run_post_stack()
 
-        queuename = os.getenv('QUEUENAME')
+        if os.getenv('JOBSCHEDULER') == 'LSF' or os.getenv('JOBSCHEDULER') == 'PBS':
 
-        putils.remove_last_job_running_products(run_file=run_file_int)
+            step_name = 'unwrap'
+            try:
+                memorymax = config[step_name]['memory']
+            except:
+                memorymax = config['DEFAULT']['memory']
 
-        jobs = js.submit_batch_jobs(batch_file=run_file_int, out_dir=self.run_dir,
-                                    work_dir=self.work_dir, memory=memorymax, walltime=walltimelimit,
-                                    queue=queuename)
+            try:
+                if config[step_name]['adjust'] == 'True':
+                    walltimelimit = putils.walltime_adjust(inps, config[step_name]['walltime'])
+                else:
+                    walltimelimit = config[step_name]['walltime']
+            except:
+                walltimelimit = config['DEFAULT']['walltime']
 
-        putils.remove_zero_size_or_length_error_files(run_file=run_file_int)
-        putils.raise_exception_if_job_exited(run_file=run_file_int)
-        putils.concatenate_error_files(run_file=run_file_int, work_dir=self.work_dir)
-        putils.move_out_job_files_to_stdout(run_file=run_file_int)
+            queuename = os.getenv('QUEUENAME')
+
+            putils.remove_last_job_running_products(run_file=run_file_int)
+
+            jobs = js.submit_batch_jobs(batch_file=run_file_int, out_dir=self.run_dir,
+                                        work_dir=self.work_dir, memory=memorymax, walltime=walltimelimit,
+                                        queue=queuename)
+
+            putils.remove_zero_size_or_length_error_files(run_file=run_file_int)
+            putils.raise_exception_if_job_exited(run_file=run_file_int)
+            putils.concatenate_error_files(run_file=run_file_int, work_dir=self.work_dir)
+            putils.move_out_job_files_to_stdout(run_file=run_file_int)
+
+        else:
+            with open(run_file_int, 'r') as f:
+                command_lines = f.readlines()
+                for command_line in command_lines:
+                    print(command_line)
+                    os.system(command_line)
 
         return
 

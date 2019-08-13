@@ -4,16 +4,11 @@
 ############################################################
 
 import os
-import sys
 import time
-
-import argparse
-from numpy import linalg as LA
 import numpy as np
 import minopy_utilities as mnp
 import dask
-import pandas as pd
-from scipy.stats import anderson_ksamp, ttest_ind
+from scipy.stats import anderson_ksamp
 from skimage.measure import label
 from minsar.objects.auto_defaults import PathFind
 
@@ -44,6 +39,8 @@ def main(iargs=None):
     # Quality (temporal coherence) calculation based on PTA
 
     inversionObj.get_pta_coherence()
+
+    print('{} is done successfuly'.format(inps.patch))
 
     return None
 

@@ -6,7 +6,6 @@
 import os
 import sys
 import gdal
-import argparse
 import numpy as np
 import isce
 import isceobj
@@ -17,7 +16,6 @@ from minsar.utils.process_utilities import add_pause_to_walltime, get_config_def
 from isceobj.Util.ImageUtil import ImageLib as IML
 from minopy_utilities import cmd_line_parse, convert_geo2image_coord
 from minsar.objects.auto_defaults import PathFind
-import dask
 
 pathObj = PathFind()
 ##############################################################################
@@ -117,7 +115,7 @@ def cropSLC(data):
     out_map = np.memmap(output_file, dtype=data_type, mode='write', shape=(pathObj.n_lines, pathObj.width))
     out_map[:, :] = inp_file[:, :]
 
-    renderISCEXML(output_file, 1, pathObj.n_lines, pathObj.width, IML.NUMPY_type(str(inp_file.dtype)), 'BIL')
+    IML.renderISCEXML(output_file, 1, pathObj.n_lines, pathObj.width, IML.NUMPY_type(str(inp_file.dtype)), 'BIL')
 
     out_img = isceobj.createSlcImage()
     out_img.load(output_file + '.xml')
@@ -182,51 +180,7 @@ def cropQualitymap(data):
 
 ##############################################################################
 
-def renderISCEXML(fname, bands, nyy, nxx, datatype, scheme,
-                  bbox=None, descr=None):
-    '''
-    Renders an ISCE XML with the right information.
-    '''
-
-    try:
-        import isce
-        import isceobj
-    except:
-        raise ImportError('ISCE has not been installed or is not importable.')
-
-    img = isceobj.createImage()
-    img.filename = fname
-    img.scheme = scheme
-    img.width = nxx
-    img.length = nyy
-    try:
-        img.dataType = isceTypeDict[datatype]
-    except:
-        try:
-            img.dataType = isceTypeDict[NUMPY_type(datatype)]
-        except:
-            raise Exception(
-                'Processing complete but ISCE XML not written as the data type is currently not supported by ISCE Image Api')
-
-    if bbox is not None:
-        img.setFirstLatitude(bbox[0])
-        img.setFirstLongitude(bbox[1])
-        img.setDeltaLatitude(bbox[2])
-        img.setDeltaLongitude(bbox[3])
-
-    if descr is not None:
-        img.addDescription(descr)
-
-    img.bands = bands
-    img.renderVRT()  ###PSA - needed since all reading is now via VRTs
-    img.setAccessMode('read')
-    img.createImage()
-    img.finalizeImage()
-    img.renderHdr()
-    return
-
 
 if __name__ == '__main__':
     main()
 
-  
