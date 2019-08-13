@@ -110,7 +110,7 @@ def cropSLC(data):
     inp_file = ds.GetRasterBand(1).ReadAsArray()[pathObj.first_row:pathObj.last_row, pathObj.first_col:pathObj.last_col]
     data_type = inp_file.dtype.type
     del ds
-
+    
     out_map = np.memmap(output_file, dtype=data_type, mode='write', shape=(pathObj.n_lines, pathObj.width))
     out_map[:, :] = inp_file[:, :]
 
@@ -182,3 +182,5 @@ def cropQualitymap(data):
 
 if __name__ == '__main__':
     main()
+
+  

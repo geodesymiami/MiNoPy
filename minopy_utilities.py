@@ -97,11 +97,11 @@ def add_mintpy_corrections(parser):
 
     return parser
 
-
 ################################################################################
 
 
 def convert_geo2image_coord_old(geo_master_dir, lat_south, lat_north, lon_west, lon_east):
+
     """ Finds the corresponding line and sample based on geographical coordinates. """
 
     ds = gdal.Open(geo_master_dir + '/lat.rdr.full.vrt', gdal.GA_ReadOnly)
@@ -195,7 +195,6 @@ def convert_geo2image_coord(geo_master_dir, master_dir, lat_south, lat_north, lo
     image_coord = [first_row, last_row, first_col, last_col]
 
     return image_coord
-
 
 ##############################################################################
 
@@ -554,7 +553,6 @@ def simulate_neighborhood_stack(corr_matrix, neighborSamples=300):
     # A 2D matrix for a neighborhood over time. Each column is the neighborhood complex data for each acquisition date
 
     neighbor_stack = np.zeros((numberOfSlc, neighborSamples), dtype=np.complex64)
-
     for ii in range(neighborSamples):
         cpxSLC = simulate_noise(corr_matrix)
         neighbor_stack[:,ii] = cpxSLC
@@ -731,3 +729,4 @@ def create_xml(fname, bands, line, sample, format):
     rslc = np.memmap(fname, dtype=np.complex64, mode='w+', shape=(bands, line, sample))
     IML.renderISCEXML(fname, bands, line, sample, format, 'BIL')
     return rslc
+

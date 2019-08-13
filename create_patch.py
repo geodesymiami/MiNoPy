@@ -16,9 +16,9 @@ import minopy_utilities as mnp
 from minsar.utils.process_utilities import add_pause_to_walltime
 from minsar.objects.auto_defaults import PathFind
 
+
 pathObj = PathFind()
 #######################
-
 
 def main(iargs=None):
     """
@@ -118,6 +118,7 @@ def create_patch(name):
         del rslc
 
         np.save(patch_name + '/count.npy', [pathObj.n_image, line, sample])
+
     else:
         print('Next patch...')
     return print("PATCH" + str(patch_row) + '_' + str(patch_col) + " is created")

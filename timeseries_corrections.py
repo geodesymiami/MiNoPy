@@ -20,7 +20,6 @@ from minsar.utils.process_utilities import get_project_name, get_work_directory,
 from minsar.objects.auto_defaults import PathFind
 from minsar.objects import message_rsmas
 import minopy_utilities as mnp
-
 pathObj = PathFind()
 
 ##########################################################################
@@ -103,6 +102,7 @@ def get_phase_linking_coherence_mask(inps, template):
     geom_file = ut.check_loaded_dataset(inps.mintpy_dir, print_msg=False)[2]
     tcoh_file = os.path.join(inps.mintpy_dir, 'temporalCoherence.h5')
     mask_file = os.path.join(inps.mintpy_dir, 'maskTempCoh.h5')
+
     tcoh_min = 0.4
 
     scp_args = '{} -m {} -o {} --shadow {}'.format(tcoh_file, tcoh_min, mask_file, geom_file)
@@ -154,6 +154,7 @@ def write_to_timeseries(inps, template):
                     os.path.join(inps.mintpy_dir, 'temporalCoherence.h5')]
 
     ifgram_file = os.path.join(inps.mintpy_dir, 'inputs/ifgramStack.h5')
+
     stack_obj = ifgramStack(ifgram_file)
     stack_obj.open(print_msg=False)
     date_list = stack_obj.get_date_list(dropIfgram=True)
