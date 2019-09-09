@@ -46,7 +46,7 @@ def cmd_line_parse(iargs=None, script=None):
 def add_common_parser(parser):
 
     commonp = parser.add_argument_group('General options:')
-    commonp.add_argument('customTemplateFile', nargs='?', help='custom template with option settings.\n')
+    commonp.add_argument('custom_template_file', nargs='?', help='custom template with option settings.\n')
     commonp.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
     commonp.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
     commonp.add_argument('--walltime', dest='wall_time', default='None',
@@ -180,7 +180,7 @@ def convert_geo2image_coord_old(geo_master_dir, master_dir, lat_south, lat_north
 
 
     master_xml = glob.glob(master_dir + '/IW*.xml')[0]
-    metadata = extract_tops_metadata(master_xml)
+    metadata = extract_tops_metadata(master_xml)[0]
     gmeta = extract_geometry_metadata(geo_master_dir + '/lat.rdr.full.xml', metadata)
     rmeta = readfile.read_isce_xml(geo_master_dir + '/lat.rdr.full.xml')
 

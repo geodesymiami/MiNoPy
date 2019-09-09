@@ -61,15 +61,15 @@ def main(iargs=None):
             print(f.read())
         raise SystemExit()
 
-    if (inps.customTemplateFile
-            and os.path.basename(inps.customTemplateFile) == 'smallbaselineApp_auto.cfg'):
-        inps.customTemplateFile = None
+    if (inps.custom_template_file
+            and os.path.basename(inps.custom_template_file) == 'smallbaselineApp_auto.cfg'):
+        inps.custom_template_file = None
     else:
-        inps.customTemplateFile = os.path.abspath(inps.customTemplateFile)
+        inps.custom_template_file = os.path.abspath(inps.custom_template_file)
 
     inps.mintpy_dir = os.path.join(inps.project_dir, pathObj.mintpydir)
 
-    app = mintpy.smallbaselineApp.TimeSeriesAnalysis(inps.customTemplateFile, inps.mintpy_dir)
+    app = mintpy.smallbaselineApp.TimeSeriesAnalysis(inps.custom_template_file, inps.mintpy_dir)
     app.startup()
 
     if app.template['mintpy.unwrapError.method']:
