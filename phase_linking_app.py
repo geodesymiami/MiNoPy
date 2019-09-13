@@ -42,7 +42,7 @@ def main(iargs=None):
     #########################################
 
     if inps.submit_flag:
-        js.submit_script(job_name, job_file_name, sys.argv[:], inp.work_dir, new_wall_time)
+        js.submit_script(job_name, job_file_name, sys.argv[:], inps.work_dir, new_wall_time)
         sys.exit(0)
 
     time.sleep(wait_seconds)
