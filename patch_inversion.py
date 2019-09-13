@@ -110,8 +110,8 @@ class PhaseLink:
             for coord in self.coords:
                 if not self.shp[:, coord[0], coord[1]].any():
                     self.get_shp_row_col(coord)
-                else:
-                    print('coord {} done before'.format(coord))
+                # else:
+                #     print('coord {} done before'.format(coord))
 
         with open(self.patch_dir + '/shp_flag', 'w') as f:
             f.write('shp step done')
@@ -124,7 +124,7 @@ class PhaseLink:
 
     def get_shp_row_col(self, data):
 
-        print(data)
+        # print(data)
 
         row_0, col_0 = data
 
@@ -262,7 +262,7 @@ class PhaseLink:
 
             for coord in self.coords:
 
-                print(coord)
+                # print(coord)
 
                 num_shp = len(self.shp[self.shp[:, coord[0], coord[1]] == 1])
                 if num_shp > 0:

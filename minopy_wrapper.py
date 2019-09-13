@@ -7,6 +7,9 @@ import os
 import sys
 import argparse
 import time
+import subprocess
+import datetime
+import contextlib
 import minopy
 import minopy.workflow
 import minopy.minopy_utilities as mnp
@@ -195,10 +198,16 @@ class NoLI:
                                                 memory=memorymax, walltime=walltimelimit, queue=queuename)
                 else:
 
-                    with open('{}.o'.format(run_file_int), 'w') as f:
-                        with contextlib.redirect_stdout(f):
-                            js.submit_job_with_launcher(batch_file=run_file_int, work_dir=inps.work_dir,
-                                                        memory=memorymax, walltime=walltimelimit, queue=queuename)
+                    try:
+                        with open('{}.o'.format(run_file_int), 'w') as f:
+                            with contextlib.redirect_stdout(f):
+                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=inps.work_dir,
+                                                            memory=memorymax, walltime=walltimelimit, queue=queuename)
+                    except:
+                        with open('{}.e'.format(run_file_int), 'w') as g:
+                            with contextlib.redirect_stderr(g):
+                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=inps.work_dir,
+                                                            memory=memorymax, walltime=walltimelimit, queue=queuename)
 
             else:
 
@@ -265,10 +274,16 @@ class NoLI:
                                                 memory=memorymax, walltime=walltimelimit, queue=queuename)
                 else:
 
-                    with open('{}.o'.format(run_file_int), 'w') as f:
-                        with contextlib.redirect_stdout(f):
-                            js.submit_job_with_launcher(batch_file=run_file_int, work_dir=inps.work_dir,
-                                                        memory=memorymax, walltime=walltimelimit, queue=queuename)
+                    try:
+                        with open('{}.o'.format(run_file_int), 'w') as f:
+                            with contextlib.redirect_stdout(f):
+                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=inps.work_dir,
+                                                            memory=memorymax, walltime=walltimelimit, queue=queuename)
+                    except:
+                        with open('{}.e'.format(run_file_int), 'w') as g:
+                            with contextlib.redirect_stderr(g):
+                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=inps.work_dir,
+                                                            memory=memorymax, walltime=walltimelimit, queue=queuename)
 
             else:
 

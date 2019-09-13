@@ -9,6 +9,8 @@ import time
 import datetime
 from minopy.minopy_utilities import cmd_line_parse
 import glob
+import subprocess
+import contextlib
 from minsar.objects import message_rsmas
 import minsar.utils.process_utilities as putils
 from minsar.objects.auto_defaults import PathFind
@@ -93,10 +95,16 @@ def main(iargs=None):
                                             memory=memorymax, walltime=walltimelimit, queue=queuename)
             else:
 
-                with open('{}.o'.format(run_minopy_inversion), 'w') as f:
-                    with contextlib.redirect_stdout(f):
-                        js.submit_job_with_launcher(batch_file=run_minopy_inversion, work_dir=inps.work_dir,
-                                                    memory=memorymax, walltime=walltimelimit, queue=queuename)
+                try:
+                    with open('{}.o'.format(run_minopy_inversion), 'w') as f:
+                        with contextlib.redirect_stdout(f):
+                            js.submit_job_with_launcher(batch_file=run_minopy_inversion, work_dir=inps.work_dir,
+                                                        memory=memorymax, walltime=walltimelimit, queue=queuename)
+                except:
+                    with open('{}.e'.format(run_minopy_inversion), 'w') as g:
+                        with contextlib.redirect_stderr(g):
+                            js.submit_job_with_launcher(batch_file=run_minopy_inversion, work_dir=inps.work_dir,
+                                                        memory=memorymax, walltime=walltimelimit, queue=queuename)
 
         else:
 
