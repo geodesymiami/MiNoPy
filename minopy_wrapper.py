@@ -168,7 +168,9 @@ class NoLI:
             runObj = CreateRun(inps)
             runObj.run_post_stack()
 
-        if os.getenv('JOBSCHEDULER') == 'LSF' or os.getenv('JOBSCHEDULER') == 'PBS':
+        supported_schedulers = ['LSF', 'PBS', 'SLURM']
+
+        if os.getenv('JOBSCHEDULER') in supported_schedulers:
 
             step_name = 'single_master_interferograms'
             try:
@@ -194,30 +196,30 @@ class NoLI:
                     "utf-8")
                 if hostname.startswith('login'):
 
-                    js.submit_job_with_launcher(batch_file=run_file_int, work_dir=inps.work_dir,
+                    js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
                                                 memory=memorymax, walltime=walltimelimit, queue=queuename)
                 else:
 
                     try:
                         with open('{}.o'.format(run_file_int), 'w') as f:
                             with contextlib.redirect_stdout(f):
-                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=inps.work_dir,
+                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
                                                             memory=memorymax, walltime=walltimelimit, queue=queuename)
                     except:
                         with open('{}.e'.format(run_file_int), 'w') as g:
                             with contextlib.redirect_stderr(g):
-                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=inps.work_dir,
+                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
                                                             memory=memorymax, walltime=walltimelimit, queue=queuename)
 
             else:
 
-                jobs = js.submit_batch_jobs(batch_file=run_file_int, out_dir=os.path.join(inps.work_dir, 'run_files'),
-                                            work_dir=inps.work_dir, memory=memorymax, walltime=walltimelimit,
+                jobs = js.submit_batch_jobs(batch_file=run_file_int, out_dir=os.path.join(self.work_dir, 'run_files'),
+                                            work_dir=self.work_dir, memory=memorymax, walltime=walltimelimit,
                                             queue=queuename)
 
                 putils.remove_zero_size_or_length_error_files(run_file=run_file_int)
                 putils.raise_exception_if_job_exited(run_file=run_file_int)
-                putils.concatenate_error_files(run_file=run_file_int, work_dir=inps.work_dir)
+                putils.concatenate_error_files(run_file=run_file_int, work_dir=self.work_dir)
                 putils.move_out_job_files_to_stdout(run_file=run_file_int)
 
             date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
@@ -244,7 +246,9 @@ class NoLI:
             runObj = CreateRun(inps)
             runObj.run_post_stack()
 
-        if os.getenv('JOBSCHEDULER') == 'LSF' or os.getenv('JOBSCHEDULER') == 'PBS':
+        supported_schedulers = ['LSF', 'PBS', 'SLURM']
+
+        if os.getenv('JOBSCHEDULER') in supported_schedulers:
 
             step_name = 'unwrap'
             try:
@@ -270,30 +274,30 @@ class NoLI:
                     "utf-8")
                 if hostname.startswith('login'):
 
-                    js.submit_job_with_launcher(batch_file=run_file_int, work_dir=inps.work_dir,
+                    js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
                                                 memory=memorymax, walltime=walltimelimit, queue=queuename)
                 else:
 
                     try:
                         with open('{}.o'.format(run_file_int), 'w') as f:
                             with contextlib.redirect_stdout(f):
-                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=inps.work_dir,
+                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
                                                             memory=memorymax, walltime=walltimelimit, queue=queuename)
                     except:
                         with open('{}.e'.format(run_file_int), 'w') as g:
                             with contextlib.redirect_stderr(g):
-                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=inps.work_dir,
+                                js.submit_job_with_launcher(batch_file=run_file_int, work_dir=self.work_dir,
                                                             memory=memorymax, walltime=walltimelimit, queue=queuename)
 
             else:
 
-                jobs = js.submit_batch_jobs(batch_file=run_file_int, out_dir=os.path.join(inps.work_dir, 'run_files'),
-                                            work_dir=inps.work_dir, memory=memorymax, walltime=walltimelimit,
+                jobs = js.submit_batch_jobs(batch_file=run_file_int, out_dir=os.path.join(self.work_dir, 'run_files'),
+                                            work_dir=self.work_dir, memory=memorymax, walltime=walltimelimit,
                                             queue=queuename)
 
                 putils.remove_zero_size_or_length_error_files(run_file=run_file_int)
                 putils.raise_exception_if_job_exited(run_file=run_file_int)
-                putils.concatenate_error_files(run_file=run_file_int, work_dir=inps.work_dir)
+                putils.concatenate_error_files(run_file=run_file_int, work_dir=self.work_dir)
                 putils.move_out_job_files_to_stdout(run_file=run_file_int)
 
             date_str = datetime.datetime.strftime(datetime.datetime.now(), '%Y%m%d:%H%M%S')
