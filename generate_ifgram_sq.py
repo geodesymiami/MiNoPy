@@ -128,8 +128,8 @@ def main(iargs=None):
             rslc_patch = np.memmap(inps.minopy_dir + '/' + patch  + '/RSLC_ref',
                                dtype=np.complex64, mode='r', shape=(np.int(inps.n_image), patch_lines, patch_samples))
             ifg_patch = np.zeros([patch_lines, patch_samples])+0j
-            master = rslc_patch[0,:,:]
-            slave = rslc_patch[np.int(inps.ifg_index),:,:]
+            master = rslc_patch[0, :, :]
+            slave = rslc_patch[np.int(inps.ifg_index), :, :]
 
             for kk in range(0, patch_lines):
                 ifg_patch[kk, 0:patch_samples + 1] = master[kk, 0:patch_samples + 1] * np.conj(slave[kk, 0:patch_samples + 1])

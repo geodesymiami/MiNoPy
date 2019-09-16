@@ -110,8 +110,8 @@ class PhaseLink:
             for coord in self.coords:
                 if not self.shp[:, coord[0], coord[1]].any():
                     self.get_shp_row_col(coord)
-                # else:
-                #     print('coord {} done before'.format(coord))
+                else:
+                    print('coord {} done before'.format(coord))
 
         with open(self.patch_dir + '/shp_flag', 'w') as f:
             f.write('shp step done')
@@ -124,7 +124,7 @@ class PhaseLink:
 
     def get_shp_row_col(self, data):
 
-        # print(data)
+        print(data)
 
         row_0, col_0 = data
 
@@ -142,11 +142,25 @@ class PhaseLink:
         testvec = win.reshape(self.num_slc, self.azimuth_window * self.range_window)
         ksres = np.zeros(self.azimuth_window * self.range_window).astype(int)
 
-        S1 = np.abs(self.rslc[0:self.num_slc, row_0, col_0])
-        S1 = S1.flatten()
+        S1 = np.abs(self.rslc[0:self.num_slc, row_0, col_0]).reshape(self.num_slc, 1)
 
         x = x.flatten()
         y = y.flatten()
+
+        '''
+        # Try correlation coefficient
+        testvec = np.transpose(np.hstack((S1, testvec)))
+        corrcoeff = np.corrcoef(testvec)
+
+        ksres = 1*(corrcoeff[0, 1::] > 0.5)
+        ksres[x < 0] = 0
+        ksres[y < 0] = 0
+        
+        '''
+
+        S1 = S1.flatten()
+
+        
 
         for m in range(testvec.shape[1]):
             if x[m] >= 0 and y[m] >= 0:
@@ -157,7 +171,7 @@ class PhaseLink:
                     # test = anderson_ksamp([S1, S2])
                     test = ks_2samp(S1, S2)
                     # test = ttest_ind(S1, S2, equal_var=False)
-                    if test[1] > 0.95:
+                    if test[1] > 0.9:
                         ksres[m] = 1
                     # if test.significance_level > 0.01:
                     #    adres[m] = 1
@@ -192,7 +206,7 @@ class PhaseLink:
 
         self.progress[ref_row:ref_row + 1, ref_col:ref_col + 1] = 1
 
-        # print(ref_row, ref_col, 'DS')
+        print(ref_row, ref_col, 'DS')
 
         return None
 
@@ -262,7 +276,7 @@ class PhaseLink:
 
             for coord in self.coords:
 
-                # print(coord)
+                print(coord)
 
                 num_shp = len(self.shp[self.shp[:, coord[0], coord[1]] == 1])
                 if num_shp > 0:

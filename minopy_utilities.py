@@ -421,7 +421,7 @@ def PTA_L_BFGS(xm):
 
         out = np.zeros([n, 1])
         out[1::, 0] = res.x
-        out = np.unwrap(out, np.pi, axis=0)
+        #out = np.unwrap(out, np.pi, axis=0)
 
         return out
 
@@ -441,7 +441,7 @@ def EVD_phase_estimation(coh0):
     vec = Eigen_vector[:, f].reshape(len(Eigen_value), 1)
     x0 = np.angle(vec)
     x0 = x0 - x0[0, 0]
-    x0 = np.unwrap(x0, np.pi, axis=0)
+    #x0 = np.unwrap(x0, np.pi, axis=0)
 
     return x0
 
@@ -459,7 +459,7 @@ def EMI_phase_estimation(coh0):
         vec = Eigen_vector[:, f[0][0]].reshape(Eigen_vector.shape[0], 1)
         x0 = np.angle(vec).reshape(len(Eigen_value), 1)
         x0 = x0 - x0[0, 0]
-        x0 = np.unwrap(x0, np.pi, axis=0)
+        #x0 = np.unwrap(x0, np.pi, axis=0)
         return x0
     else:
         print('warning: coherence matrix not positive semidifinite, It is switched from EMI to EVD')
