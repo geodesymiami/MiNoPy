@@ -15,7 +15,7 @@ import mintpy
 import mintpy.workflow
 from mintpy.utils import readfile, utils as ut
 import minsar.job_submission as js
-from minsar.utils.process_utilities import add_pause_to_walltime
+from minsar.utils.process_utilities import add_pause_to_walltime, get_config_defaults
 from minsar.objects.auto_defaults import PathFind
 from minsar.objects import message_rsmas
 import minopy.minopy_utilities as mnp
@@ -29,7 +29,7 @@ def main(iargs=None):
     start_time = time.time()
     inps = mnp.cmd_line_parse(iargs, script='timeseries_corrections')
 
-    config = putils.get_config_defaults(config_file='job_defaults.cfg')
+    config = get_config_defaults(config_file='job_defaults.cfg')
 
     job_file_name = 'timeseries_corrections'
     job_name = job_file_name
