@@ -66,16 +66,16 @@ def main(iargs=None):
     patch_cols = np.load(inps.minopy_dir + '/colpatch.npy')
 
     patch_rows_overlap = np.load(inps.minopy_dir + '/rowpatch.npy')
-    patch_rows_overlap[1, 0, 0] = patch_rows_overlap[1, 0, 0] - azimuth_win + 1
-    patch_rows_overlap[0, 0, 1::] = patch_rows_overlap[0, 0, 1::] + azimuth_win + 1
-    patch_rows_overlap[1, 0, 1::] = patch_rows_overlap[1, 0, 1::] - azimuth_win + 1
-    patch_rows_overlap[1, 0, -1] = patch_rows_overlap[1, 0, -1] + azimuth_win - 1
+    patch_rows_overlap[1, 0, 0] = patch_rows_overlap[1, 0, 0] - (azimuth_win - 1)/2
+    patch_rows_overlap[0, 0, 1::] = patch_rows_overlap[0, 0, 1::] + (azimuth_win - 1)/2
+    patch_rows_overlap[1, 0, 1::] = patch_rows_overlap[1, 0, 1::] - (azimuth_win - 1)/2
+    patch_rows_overlap[1, 0, -1] = patch_rows_overlap[1, 0, -1] + (azimuth_win + 1)/2 - 1
 
     patch_cols_overlap = np.load(inps.minopy_dir + '/colpatch.npy')
-    patch_cols_overlap[1, 0, 0] = patch_cols_overlap[1, 0, 0] - range_win + 1
-    patch_cols_overlap[0, 0, 1::] = patch_cols_overlap[0, 0, 1::] + range_win + 1
-    patch_cols_overlap[1, 0, 1::] = patch_cols_overlap[1, 0, 1::] - range_win + 1
-    patch_cols_overlap[1, 0, -1] = patch_cols_overlap[1, 0, -1] + range_win - 1
+    patch_cols_overlap[1, 0, 0] = patch_cols_overlap[1, 0, 0] - (range_win - 1)/2
+    patch_cols_overlap[0, 0, 1::] = patch_cols_overlap[0, 0, 1::] + (range_win - 1)/2
+    patch_cols_overlap[1, 0, 1::] = patch_cols_overlap[1, 0, 1::] - (range_win - 1)/2
+    patch_cols_overlap[1, 0, -1] = patch_cols_overlap[1, 0, -1] + (range_win + 1)/2 - 1
 
     first_row = patch_rows_overlap[0, 0, 0]
     last_row = patch_rows_overlap[1, 0, -1]
@@ -115,28 +115,13 @@ def main(iargs=None):
         col1 = patch_cols_overlap[0, 0, col]
         col2 = patch_cols_overlap[1, 0, col]
 
-        patch_lines = row2 - row1
-        patch_samples = col2 - col1
+        patch_lines = patch_rows[1, 0, row] - patch_rows[0, 0, row]
+        patch_samples = patch_cols[1, 0, col] - patch_cols[0, 0, col]
 
-        if row1 == 0:
-            f_row = 0
-        else:
-            f_row = row1 + azimuth_win + 1
-
-        if row2 == patch_rows_overlap[1, 0, -1]:
-            l_row = row2
-        else:
-            l_row = row2 - azimuth_win + 1
-
-        if col1 == 0:
-            f_col = 0
-        else:
-            f_col = col1 + range_win + 1
-
-        if col2 == patch_cols_overlap[1, 0, -1]:
-            l_col = col2
-        else:
-            l_col = col2 - range_win + 1
+        f_row = row1 - patch_rows[0, 0, row]
+        l_row = row2 - patch_rows[0, 0, row]
+        f_col = col1 - patch_cols[0, 0, col]
+        l_col = col2 - patch_cols[0, 0, col]
 
         if doq:
             qlty = np.memmap(inps.minopy_dir + '/' + patch  + '/quality',
@@ -154,8 +139,8 @@ def main(iargs=None):
             master = rslc_patch[0, :, :]
             slave = rslc_patch[np.int(inps.ifg_index), :, :]
 
-            for kk in range(0, patch_lines):
-                ifg_patch[kk, 0:patch_samples + 1] = master[kk, 0:patch_samples + 1] * np.conj(slave[kk, 0:patch_samples + 1])
+            for kk in range(f_row, l_row):
+                ifg_patch[kk, f_col:l_col + 1] = master[kk, f_col:l_col + 1] * np.conj(slave[kk, f_col:l_col + 1])
 
             ifg[row1:row2 + 1, col1:col2 + 1] = ifg_patch[f_row:l_row + 1, f_col:l_col + 1]
 
