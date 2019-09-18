@@ -66,16 +66,16 @@ def main(iargs=None):
     patch_cols = np.load(inps.minopy_dir + '/colpatch.npy')
 
     patch_rows_overlap = np.load(inps.minopy_dir + '/rowpatch.npy')
-    patch_rows_overlap[1, 0, 0] = patch_rows_overlap[1, 0, 0] - (azimuth_win - 1)/2
-    patch_rows_overlap[0, 0, 1::] = patch_rows_overlap[0, 0, 1::] + (azimuth_win - 1)/2
-    patch_rows_overlap[1, 0, 1::] = patch_rows_overlap[1, 0, 1::] - (azimuth_win - 1)/2
-    patch_rows_overlap[1, 0, -1] = patch_rows_overlap[1, 0, -1] + (azimuth_win + 1)/2 - 1
+    patch_rows_overlap[1, 0, 0] = patch_rows_overlap[1, 0, 0] - azimuth_win - 1
+    patch_rows_overlap[0, 0, 1::] = patch_rows_overlap[0, 0, 1::] + azimuth_win - 1
+    patch_rows_overlap[1, 0, 1::] = patch_rows_overlap[1, 0, 1::] - azimuth_win - 1
+    patch_rows_overlap[1, 0, -1] = patch_rows_overlap[1, 0, -1] + azimuth_win + 1
 
     patch_cols_overlap = np.load(inps.minopy_dir + '/colpatch.npy')
-    patch_cols_overlap[1, 0, 0] = patch_cols_overlap[1, 0, 0] - (range_win - 1)/2
-    patch_cols_overlap[0, 0, 1::] = patch_cols_overlap[0, 0, 1::] + (range_win - 1)/2
-    patch_cols_overlap[1, 0, 1::] = patch_cols_overlap[1, 0, 1::] - (range_win - 1)/2
-    patch_cols_overlap[1, 0, -1] = patch_cols_overlap[1, 0, -1] + (range_win + 1)/2 - 1
+    patch_cols_overlap[1, 0, 0] = patch_cols_overlap[1, 0, 0] - range_win - 1
+    patch_cols_overlap[0, 0, 1::] = patch_cols_overlap[0, 0, 1::] + range_win - 1
+    patch_cols_overlap[1, 0, 1::] = patch_cols_overlap[1, 0, 1::] - range_win - 1
+    patch_cols_overlap[1, 0, -1] = patch_cols_overlap[1, 0, -1] + range_win + 1
 
     first_row = patch_rows_overlap[0, 0, 0]
     last_row = patch_rows_overlap[1, 0, -1]
@@ -129,7 +129,8 @@ def main(iargs=None):
             Quality.bands[0][row1:row2 + 1, col1:col2 + 1] = qlty[f_row:l_row + 1, f_col:l_col + 1]
 
             shp_p = np.memmap(inps.minopy_dir + '/' + patch + '/SHP',
-                             dtype=np.int, mode='r', shape=(np.int(inps.n_image), patch_lines, patch_samples))
+                             dtype='byte', mode='r', shape=(range_win*azimuth_win, patch_lines, patch_samples))
+
             SHP.bands[0][row1:row2 + 1, col1:col2 + 1] = np.sum(shp_p[:, f_row:l_row + 1, f_col:l_col + 1], axis=0)
 
         else:
