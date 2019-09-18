@@ -91,8 +91,11 @@ def main(iargs=None):
             os.mkdir(inps.output_dir)
 
         outputq = inps.output_dir + '/Quality.rdr'
+        outputshp = inps.output_dir + '/SHP.rdr'
         Quality = IML.memmap(outputq, mode='write', nchannels=1,
                              nxx=width, nyy=n_line, scheme='BIL', dataType='f')
+        SHP = IML.memmap(outputshp, mode='write', nchannels=1,
+                             nxx=width, nyy=n_line, scheme='BIL', dataType='int')
         doq = True
     else:
 
@@ -112,18 +115,38 @@ def main(iargs=None):
         col1 = patch_cols_overlap[0, 0, col]
         col2 = patch_cols_overlap[1, 0, col]
 
-        patch_lines = patch_rows[1][0][row] - patch_rows[0][0][row]
-        patch_samples = patch_cols[1][0][col] - patch_cols[0][0][col]
+        patch_lines = row2 - row1
+        patch_samples = col2 - col1
 
-        f_row = (row1 - patch_rows[0, 0, row])
-        l_row = patch_lines - (patch_rows[1, 0, row] - row2)
-        f_col = (col1 - patch_cols[0, 0, col])
-        l_col = patch_samples - (patch_cols[1, 0, col] - col2)
+        if row1 == 0:
+            f_row = 0
+        else:
+            f_row = row1 + azimuth_win + 1
+
+        if row2 == patch_rows_overlap[1, 0, -1]:
+            l_row = row2
+        else:
+            l_row = row2 - azimuth_win + 1
+
+        if col1 == 0:
+            f_col = 0
+        else:
+            f_col = col1 + range_win + 1
+
+        if col2 == patch_cols_overlap[1, 0, -1]:
+            l_col = col2
+        else:
+            l_col = col2 - range_win + 1
 
         if doq:
             qlty = np.memmap(inps.minopy_dir + '/' + patch  + '/quality',
                              dtype=np.float32, mode='r', shape=(patch_lines, patch_samples))
             Quality.bands[0][row1:row2 + 1, col1:col2 + 1] = qlty[f_row:l_row + 1, f_col:l_col + 1]
+
+            shp_p = np.memmap(inps.minopy_dir + '/' + patch + '/SHP',
+                             dtype=np.int, mode='r', shape=(np.int(inps.n_image), patch_lines, patch_samples))
+            SHP.bands[0][row1:row2 + 1, col1:col2 + 1] = np.sum(shp_p[:, f_row:l_row + 1, f_col:l_col + 1], axis=0)
+
         else:
             rslc_patch = np.memmap(inps.minopy_dir + '/' + patch  + '/RSLC_ref',
                                dtype=np.complex64, mode='r', shape=(np.int(inps.n_image), patch_lines, patch_samples))
@@ -155,6 +178,29 @@ def main(iargs=None):
         os.system(cmd)
 
         ds = gdal.Open(outputq, gdal.GA_ReadOnly)
+
+        ds.SetMetadata({'plmethod': inps.plmethod})
+
+        ds = None
+
+        ## SHP
+
+        SHP = None
+
+        IML.renderISCEXML(outputshp, 1, n_line, width, 'int', 'BIL')
+        out_img = isceobj.createImage()
+        out_img.load(outputshp + '.xml')
+        out_img.imageType = 'int'
+        out_img.renderHdr()
+        try:
+            out_map.bands[0].base.base.flush()
+        except:
+            pass
+
+        cmd = 'gdal_translate -of ENVI -co INTERLEAVE=BIL ' + outputq + '.vrt ' + outputq
+        os.system(cmd)
+
+        ds = gdal.Open(outputshp, gdal.GA_ReadOnly)
 
         ds.SetMetadata({'plmethod': inps.plmethod})
 
