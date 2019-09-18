@@ -66,16 +66,18 @@ def main(iargs=None):
     patch_cols = np.load(inps.minopy_dir + '/colpatch.npy')
 
     patch_rows_overlap = np.load(inps.minopy_dir + '/rowpatch.npy')
-    patch_rows_overlap[1, 0, 0] = patch_rows_overlap[1, 0, 0] - azimuth_win - 1
-    patch_rows_overlap[0, 0, 1::] = patch_rows_overlap[0, 0, 1::] + azimuth_win - 1
-    patch_rows_overlap[1, 0, 1::] = patch_rows_overlap[1, 0, 1::] - azimuth_win - 1
-    patch_rows_overlap[1, 0, -1] = patch_rows_overlap[1, 0, -1] + azimuth_win + 1
+    patch_rows_overlap[1, 0, 0] = patch_rows_overlap[1, 0, 0] - azimuth_win + 1
+    patch_rows_overlap[0, 0, 1::] = patch_rows_overlap[0, 0, 1::] + azimuth_win + 1
+    patch_rows_overlap[1, 0, 1::] = patch_rows_overlap[1, 0, 1::] - azimuth_win + 1
+    patch_rows_overlap[1, 0, -1] = patch_rows_overlap[1, 0, -1] + azimuth_win - 1
 
     patch_cols_overlap = np.load(inps.minopy_dir + '/colpatch.npy')
-    patch_cols_overlap[1, 0, 0] = patch_cols_overlap[1, 0, 0] - range_win - 1
-    patch_cols_overlap[0, 0, 1::] = patch_cols_overlap[0, 0, 1::] + range_win - 1
-    patch_cols_overlap[1, 0, 1::] = patch_cols_overlap[1, 0, 1::] - range_win - 1
-    patch_cols_overlap[1, 0, -1] = patch_cols_overlap[1, 0, -1] + range_win + 1
+    patch_cols_overlap[1, 0, 0] = patch_cols_overlap[1, 0, 0] - range_win + 1
+    patch_cols_overlap[0, 0, 1::] = patch_cols_overlap[0, 0, 1::] + range_win + 1
+    patch_cols_overlap[1, 0, 1::] = patch_cols_overlap[1, 0, 1::] - range_win + 1
+    patch_cols_overlap[1, 0, -1] = patch_cols_overlap[1, 0, -1] + range_win - 1
+
+    print(patch_rows_overlap, patch_cols_overlap)
 
     first_row = patch_rows_overlap[0, 0, 0]
     last_row = patch_rows_overlap[1, 0, -1]
@@ -140,7 +142,7 @@ def main(iargs=None):
             master = rslc_patch[0, :, :]
             slave = rslc_patch[np.int(inps.ifg_index), :, :]
 
-            for kk in range(f_row, l_row):
+            for kk in range(0, patch_lines):
                 ifg_patch[kk, f_col:l_col + 1] = master[kk, f_col:l_col + 1] * np.conj(slave[kk, f_col:l_col + 1])
 
             ifg[row1:row2 + 1, col1:col2 + 1] = ifg_patch[f_row:l_row + 1, f_col:l_col + 1]
