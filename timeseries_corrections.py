@@ -13,6 +13,7 @@ import numpy as np
 import gdal
 import mintpy
 import mintpy.workflow
+from mintpy.smallbaselineApp import TimeSeriesAnalysis
 from mintpy.utils import readfile, utils as ut
 import minsar.job_submission as js
 from minsar.utils.process_utilities import add_pause_to_walltime, get_config_defaults
@@ -67,9 +68,9 @@ def main(iargs=None):
     else:
         inps.custom_template_file = os.path.abspath(inps.custom_template_file)
 
-    inps.mintpy_dir = os.path.join(inps.project_dir, pathObj.mintpydir)
+    inps.mintpy_dir = os.path.join(inps.work_dir, pathObj.mintpydir)
 
-    app = mintpy.smallbaselineApp.TimeSeriesAnalysis(inps.custom_template_file, inps.mintpy_dir)
+    app = TimeSeriesAnalysis(inps.custom_template_file, inps.mintpy_dir)
     app.startup()
 
     if app.template['mintpy.unwrapError.method']:
@@ -102,7 +103,7 @@ def get_phase_linking_coherence_mask(inps, template):
 
     tcoh_min = 0.4
 
-    scp_args = '{} -m {} -o {} --shadow {}'.format(tcoh_file, tcoh_min, mask_file, geom_file)
+    scp_args = '{} --nonzero -o {} --update'.format(tcoh_file, mask_file)
     print('generate_mask.py', scp_args)
 
     # update mode: run only if:
@@ -198,7 +199,6 @@ def write_to_timeseries(inps, template):
     gfilename = os.path.join(os.getenv('SCRATCHDIR'), inps.project_name, 'merged/geom_master/Quality.rdr')
     ds = gdal.Open(gfilename, gdal.GA_ReadOnly)
     quality_map = ds.GetRasterBand(1).ReadAsArray()
-    inps.plmethod = ds.GetMetadata()['plmethod']
 
     if 'SUBSET_XMIN' in metadata:
         first_row = int(metadata['SUBSET_YMIN'])
@@ -208,7 +208,7 @@ def write_to_timeseries(inps, template):
 
         quality_map = quality_map[first_row:last_row, first_col:last_col]
 
-    write2hdf5_file(ifgram_file, metadata, ts, quality_map, ts_std, num_inv_ifg, suffix='', inps=inps)
+    write2hdf5_file(ifgram_file, metadata, ts, quality_map, num_inv_ifg, suffix='', inps=inps)
 
     get_phase_linking_coherence_mask(inps, template)
 

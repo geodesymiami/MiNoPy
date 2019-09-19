@@ -165,12 +165,6 @@ def main(iargs=None):
         cmd = 'gdal_translate -of ENVI -co INTERLEAVE=BIL ' + outputq + '.vrt ' + outputq
         os.system(cmd)
 
-        ds = gdal.Open(outputq, gdal.GA_ReadOnly)
-
-        ds.SetMetadata({'plmethod': inps.plmethod})
-
-        ds = None
-
         ## SHP
 
         SHP = None
@@ -187,12 +181,6 @@ def main(iargs=None):
 
         cmd = 'gdal_translate -of ENVI -co INTERLEAVE=BIL ' + outputq + '.vrt ' + outputq
         os.system(cmd)
-
-        ds = gdal.Open(outputshp, gdal.GA_ReadOnly)
-
-        ds.SetMetadata({'plmethod': inps.plmethod})
-
-        ds = None
 
     else:
 

@@ -316,7 +316,7 @@ class NoLI:
         """ Time series corrections
         """
 
-        minopy.timeseries_corrections.main([self.custom_template_file, '--submit'])
+        minopy.timeseries_corrections.main([self.custom_template_file])
         return
 
     def run_email_results(self):
