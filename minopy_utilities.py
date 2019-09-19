@@ -776,3 +776,12 @@ def create_xml(fname, bands, line, sample, format):
 
     return rslc
 
+##############################################
+
+
+def ecdf(data):
+    """ Compute ECDF """
+    x = np.sort(data)
+    n = x.size
+    y = np.arange(1, n+1) / n
+    return(x,y)

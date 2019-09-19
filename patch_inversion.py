@@ -147,6 +147,7 @@ class PhaseLink:
         x = x.flatten()
         y = y.flatten()
 
+        '''
         # Try correlation coefficient
         testvec = np.transpose(np.hstack((S1, testvec)))
         corrcoeff = np.corrcoef(testvec)
@@ -157,11 +158,13 @@ class PhaseLink:
 
         '''
         S1 = S1.flatten()
+        S1 = mnp.ecdf(S1)
 
         for m in range(testvec.shape[1]):
             if x[m] >= 0 and y[m] >= 0:
                 S2 = testvec[:, m]
                 S2 = S2.flatten()
+                S2 = mnp.ecdf(S2)
 
                 try:
                     # test = anderson_ksamp([S1, S2])
@@ -175,9 +178,7 @@ class PhaseLink:
                     #    adres[m] = 1
                 except:
                     ksres[m] = 0
-                    #adres[m] = 0
-                    
-        '''
+                    # adres[m] = 0
 
         ks_label = label(ksres.reshape(self.azimuth_window, self.range_window), background=False, connectivity=2)
         ksres = 1 * (ks_label == ks_label[self.reference_row, self.reference_col])
