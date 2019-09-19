@@ -11,7 +11,7 @@ import gdal
 import isce
 import isceobj
 from isceobj.Util.ImageUtil import ImageLib as IML
-from FilterAndCoherence import estCoherence
+from FilterAndCoherence import estCoherence, runFilter
 
 
 ##############################################################################
@@ -92,11 +92,11 @@ def main(iargs=None):
         if not os.path.isdir(inps.output_dir):
             os.mkdir(inps.output_dir)
 
-        outputq = inps.output_dir + '/Quality.rdr'
-        outputshp = inps.output_dir + '/SHP.rdr'
-        Quality = IML.memmap(outputq, mode='write', nchannels=1,
+        output_quality = inps.output_dir + '/Quality.rdr'
+        output_shp = inps.output_dir + '/SHP.rdr'
+        Quality = IML.memmap(output_quality, mode='write', nchannels=1,
                              nxx=width, nyy=n_line, scheme='BIL', dataType='f')
-        SHP = IML.memmap(outputshp, mode='write', nchannels=1,
+        SHP = IML.memmap(output_shp, mode='write', nchannels=1,
                              nxx=width, nyy=n_line, scheme='BIL', dataType='int')
         doq = True
     else:
@@ -104,8 +104,8 @@ def main(iargs=None):
         if not os.path.isdir(inps.output_dir):
             os.mkdir(inps.output_dir)
 
-        outputint = inps.output_dir + '/filt_fine.int'
-        ifg = np.memmap(outputint, dtype=np.complex64, mode='w+', shape=(n_line, width))
+        output_int = inps.output_dir + '/fine.int'
+        ifg = np.memmap(output_int, dtype=np.complex64, mode='w+', shape=(n_line, width))
         doq = False
 
     for patch in patch_list:
@@ -151,14 +151,14 @@ def main(iargs=None):
 
         Quality = None
 
-        IML.renderISCEXML(outputq, 1, n_line, width, 'f', 'BIL')
+        IML.renderISCEXML(output_quality, 1, n_line, width, 'f', 'BIL')
 
         out_img = isceobj.createImage()
-        out_img.load(outputq + '.xml')
+        out_img.load(output_quality + '.xml')
         out_img.imageType = 'f'
         out_img.renderHdr()
         try:
-            out_map.bands[0].base.base.flush()
+            out_img.bands[0].base.base.flush()
         except:
             pass
 
@@ -169,17 +169,17 @@ def main(iargs=None):
 
         SHP = None
 
-        IML.renderISCEXML(outputshp, 1, n_line, width, 'int', 'BIL')
+        IML.renderISCEXML(output_shp, 1, n_line, width, 'int', 'BIL')
         out_img = isceobj.createImage()
-        out_img.load(outputshp + '.xml')
+        out_img.load(output_shp + '.xml')
         out_img.imageType = 'int'
         out_img.renderHdr()
         try:
-            out_map.bands[0].base.base.flush()
+            out_img.bands[0].base.base.flush()
         except:
             pass
 
-        cmd = 'gdal_translate -of ENVI -co INTERLEAVE=BIL ' + outputq + '.vrt ' + outputq
+        cmd = 'gdal_translate -of ENVI -co INTERLEAVE=BIL ' + output_quality + '.vrt ' + output_quality
         os.system(cmd)
 
     else:
@@ -187,16 +187,21 @@ def main(iargs=None):
         ifg = None
 
         obj_int = isceobj.createIntImage()
-        obj_int.setFilename(outputint)
+        obj_int.setFilename(output_int)
         obj_int.setWidth(width)
         obj_int.setLength(n_line)
         obj_int.setAccessMode('READ')
         obj_int.renderHdr()
         obj_int.renderVRT()
 
-        corfile = os.path.join(inps.output_dir, 'filt_fine.cor')
+        filt_file = inps.output_dir + '/filt_fine.int'
+        filter_strength = 0.5
 
-        estCoherence(outputint, corfile)
+        runFilter(output_int, filt_file, filter_strength)
+
+        cor_file = os.path.join(inps.output_dir, 'filt_fine.cor')
+
+        estCoherence(filt_file, cor_file)
 
 
 if __name__ == '__main__':

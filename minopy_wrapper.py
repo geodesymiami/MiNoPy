@@ -136,7 +136,7 @@ class NoLI:
         self.work_dir = inps.work_dir
         self.run_dir = os.path.join(inps.work_dir, pathObj.rundir)
         self.cwd = os.path.abspath(os.getcwd())
-        self.minopy_dir = inps.minopy_dir
+        self.mintpy_dir = os.path.join(self.work_dir, pathObj.mintpydir)
 
         return
 
