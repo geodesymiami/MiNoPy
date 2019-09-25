@@ -143,18 +143,21 @@ class NoLI:
     def run_crop(self):
         """ Cropping images using crop_sentinel.py script.
         """
+        message_rsmas.log(self.work_dir, 'crop_sentinel.py {}'.format(self.custom_template_file))
         minopy.crop_sentinel.main([self.custom_template_file])
         return
 
     def run_create_patch(self):
         """ Dividing the area into patches.
         """
+        message_rsmas.log(self.work_dir, 'create_patch.py {}'.format(self.custom_template_file))
         minopy.create_patch.main([self.custom_template_file])
         return
 
     def run_phase_linking(self):
         """ Non-Linear phase inversion.
         """
+        message_rsmas.log(self.work_dir, 'phase_linking_app.py {}'.format(self.custom_template_file))
         minopy.phase_linking_app.main([self.custom_template_file])
         return
 
@@ -187,6 +190,10 @@ class NoLI:
                 walltimelimit = config['DEFAULT']['walltime']
 
             queuename = os.getenv('QUEUENAME')
+
+            message_rsmas.log(self.work_dir, 'job_submission.py {} --memory {} --walltime {}'.format(run_file_int,
+                                                                                                     memorymax,
+                                                                                                     walltimelimit))
 
             putils.remove_last_job_running_products(run_file=run_file_int)
 
@@ -266,6 +273,10 @@ class NoLI:
 
             queuename = os.getenv('QUEUENAME')
 
+            message_rsmas.log(self.work_dir, 'job_submission.py {} --memory {} --walltime {}'.format(run_file_int,
+                                                                                                     memorymax,
+                                                                                                     walltimelimit))
+
             putils.remove_last_job_running_products(run_file=run_file_int)
 
             if os.getenv('JOBSCHEDULER') in ['SLURM', 'sge']:
@@ -315,14 +326,14 @@ class NoLI:
     def run_mintpy(self):
         """ Time series corrections
         """
-
+        message_rsmas.log(self.work_dir, 'timeseries_correction.py {}'.format(self.custom_template_file))
         minopy.timeseries_corrections.main([self.custom_template_file])
         return
 
     def run_email_results(self):
         """ Time series corrections
         """
-
+        message_rsmas.log(self.work_dir, 'email_results.py {}'.format(self.custom_template_file))
         email_results.main([self.custom_template_file])
         return
 

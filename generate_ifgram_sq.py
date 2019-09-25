@@ -126,7 +126,7 @@ def main(iargs=None):
         l_col = col2 - patch_cols[0, 0, col]
 
         if doq:
-            qlty = np.memmap(inps.minopy_dir + '/' + patch  + '/quality',
+            qlty = np.memmap(inps.minopy_dir + '/' + patch + '/quality',
                              dtype=np.float32, mode='r', shape=(patch_lines, patch_samples))
             Quality.bands[0][row1:row2 + 1, col1:col2 + 1] = qlty[f_row:l_row + 1, f_col:l_col + 1]
 
@@ -136,7 +136,7 @@ def main(iargs=None):
             SHP.bands[0][row1:row2 + 1, col1:col2 + 1] = np.sum(shp_p[:, f_row:l_row + 1, f_col:l_col + 1], axis=0)
 
         else:
-            rslc_patch = np.memmap(inps.minopy_dir + '/' + patch  + '/RSLC_ref',
+            rslc_patch = np.memmap(inps.minopy_dir + '/' + patch + '/RSLC_ref',
                                dtype=np.complex64, mode='r', shape=(np.int(inps.n_image), patch_lines, patch_samples))
             ifg_patch = np.zeros([patch_lines, patch_samples])+0j
             master = rslc_patch[0, :, :]
@@ -162,7 +162,7 @@ def main(iargs=None):
         except:
             pass
 
-        cmd = 'gdal_translate -of ENVI -co INTERLEAVE=BIL ' + outputq + '.vrt ' + outputq
+        cmd = 'gdal_translate -of ENVI -co INTERLEAVE=BIL ' + output_quality + '.vrt ' + output_quality
         os.system(cmd)
 
         ## SHP
@@ -179,7 +179,7 @@ def main(iargs=None):
         except:
             pass
 
-        cmd = 'gdal_translate -of ENVI -co INTERLEAVE=BIL ' + output_quality + '.vrt ' + output_quality
+        cmd = 'gdal_translate -of ENVI -co INTERLEAVE=BIL ' + output_shp + '.vrt ' + output_shp
         os.system(cmd)
 
     else:

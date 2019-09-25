@@ -97,11 +97,10 @@ def main(iargs=None):
 def get_phase_linking_coherence_mask(inps, template):
     """Generate reliable pixel mask from temporal coherence"""
 
-    geom_file = ut.check_loaded_dataset(inps.mintpy_dir, print_msg=False)[2]
     tcoh_file = os.path.join(inps.mintpy_dir, 'temporalCoherence.h5')
     mask_file = os.path.join(inps.mintpy_dir, 'maskTempCoh.h5')
 
-    tcoh_min = 0.4
+    tcoh_min = 0.25
 
     scp_args = '{} --nonzero -o {} --update'.format(tcoh_file, mask_file)
     print('generate_mask.py', scp_args)
@@ -165,9 +164,6 @@ def write_to_timeseries(inps, template):
 
     num_row = stack_obj.length
     num_col = stack_obj.width
-    num_pixel = num_row * num_col
-    ts_std = np.zeros((num_date, num_pixel), np.float32)
-    ts_std = ts_std.reshape(num_date, num_row, num_col)
 
     phase2range = -1 * float(stack_obj.metadata['WAVELENGTH']) / (4. * np.pi)
 
@@ -175,7 +171,7 @@ def write_to_timeseries(inps, template):
     ref_phase = stack_obj.get_reference_phase(dropIfgram=False)
     unwDatasetName = 'unwrapPhase'
     mask_dataset_name = None
-    mask_threshold = 0.4
+    mask_threshold = 0.25
 
     pha_data = read_unwrap_phase(stack_obj,
                                  box,
@@ -207,6 +203,8 @@ def write_to_timeseries(inps, template):
         last_col = int(metadata['SUBSET_XMAX'])
 
         quality_map = quality_map[first_row:last_row, first_col:last_col]
+
+    os.chdir(inps.mintpy_dir)
 
     write2hdf5_file(ifgram_file, metadata, ts, quality_map, num_inv_ifg, suffix='', inps=inps)
 

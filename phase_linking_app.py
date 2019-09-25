@@ -54,7 +54,7 @@ def main(iargs=None):
 
     os.system('python -W ignore patch_inversion.py')
 
-    run_minopy_inversion = os.path.join(inps.minopy_dir, 'run_minopy_inversion')
+    run_minopy_inversion = os.path.join(inps.work_dir, 'run_files', 'run_minopy_inversion')
 
     with open(run_minopy_inversion, 'w') as f:
         for item in patch_list:

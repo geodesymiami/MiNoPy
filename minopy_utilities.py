@@ -14,6 +14,7 @@ import glob
 from numpy import linalg as LA
 from scipy.optimize import minimize, Bounds
 from scipy import stats
+from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind
 import gdal
 import isce
 import isceobj
@@ -112,12 +113,8 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
     lat_lut = ds.GetRasterBand(1).ReadAsArray()
     del ds
 
-    #idx_lat = np.where((lat >= lat_south) & (lat <= lat_north))
-    #lat_c = np.int(np.mean(idx_lat[0]))
-
     ds = gdal.Open(geo_master_dir + "/lon.rdr.full.vrt", gdal.GA_ReadOnly)
     lon_lut = ds.GetRasterBand(1).ReadAsArray()
-    #lon = lon[lat_c, :]
     del ds
 
     mask_y = np.multiply(lat_lut >= lat_south, lat_lut <= lat_north)
@@ -132,21 +129,6 @@ def convert_geo2image_coord(geo_master_dir, lat_south, lat_north, lon_west, lon_
     last_col = np.rint(np.max(cols)).astype(int)
 
     image_coord = [first_row, last_row, first_col, last_col]
-
-    #idx_lon = np.where((lon >= lon_west) & (lon <= lon_east))
-
-    #lon_c = np.int(np.mean(idx_lon))
-
-    #lat = lat[:, lon_c]
-
-    #idx_lat = np.where((lat >= lat_south) & (lat <= lat_north))
-
-    #first_row = np.min(idx_lat)
-    #last_row = np.max(idx_lat)
-    #first_col = np.min(idx_lon)
-    #last_col = np.max(idx_lon)
-
-    #image_coord = [first_row, last_row, first_col, last_col]
 
     return image_coord
 
@@ -357,33 +339,20 @@ def regularize_matrix(M):
 
 ###############################################################################
 
-# def gam_pta_f(g1, g2):
-#    """ Returns squeesar PTA coherence between the initial and estimated phase vectors. """
 
-#    n1 = g1.shape[0]
-#    [r, c] = np.where(g1 != 0)
-#    g11 = g1[r, c].reshape(len(r))
-#    g22 = g2[r, c].reshape(len(r))
-#    gam = np.real(np.dot(np.exp(1j * g11), np.exp(-1j * g22))) * 2 / (n1 ** 2 - n1)
-
-#    return gam
-
-
-def gam_pta(data):
+def gam_pta(ph_filt, ph_refined):
     """ Returns squeesar PTA coherence between the initial and estimated phase vectors. """
 
-    phase_initial, phase_refined, row, col = data
-    N = len(phase_initial)
-    phase_ref = np.matrix(np.reshape(phase_refined, [N, 1]))
-    phase_init = np.matrix(phase_initial)
-    phase_n = np.multiply(np.exp(1j * phase_init), np.exp(-1j * phase_ref))
-    A = np.repeat(phase_n, N, axis=1)
-    phase_k = np.multiply(np.exp(-1j * phase_init), np.exp(1j * phase_ref))
-    SUM_Ph = np.sum(np.matmul(np.triu(A), phase_k))
-    gam = np.real(SUM_Ph) * 2 / (N ** 2 - N)
+    n = np.shape(ph_filt)[0]
+    phi_mat = np.exp(1j * (np.triu(ph_filt) - np.multiply(np.diag(np.ones([n])), np.triu(ph_filt))))
+    g1 = np.exp(1j * ph_refined).reshape(n, 1)
+    g2 = np.exp(-1j * ph_refined).reshape(1, n)
+    theta_mat = np.triu(np.matmul(g1, g2))
+    theta_mat = np.conj(theta_mat - np.multiply(np.diag(np.ones([n])), np.triu(theta_mat)))
+    SUM_ph = np.sum(np.multiply(phi_mat, theta_mat))
+    gam = np.real(SUM_ph) * 2 / (n ** 2 - n)
 
-    return gam, row, col
-
+    return gam
 
 ###############################################################################
 
@@ -785,3 +754,65 @@ def ecdf(data):
     n = x.size
     y = np.arange(1, n+1) / n
     return(x,y)
+
+
+def ks2smapletest(S1, S2, threshold=0.4):
+    try:
+        distance = ecdf_distance(S1, S2)
+        if distance <= threshold:
+             return 1
+        else:
+            return 0
+    except:
+        return 0
+
+
+def ttest_indtest(S1, S2):
+    try:
+        test = ttest_ind(S1, S2, equal_var=False)
+        if test[1] <= 0.05:
+             return 1
+        else:
+            return 0
+    except:
+        return 0
+
+
+def ADtest(S1, S2):
+    try:
+        test = anderson_ksamp([S1, S2])
+        if test.significance_level <= 0.05:
+             return 1
+        else:
+            return 0
+    except:
+        return 0
+
+
+#####
+
+def ks_lut(N1, N2, alpha=0.05):
+    N = (N1 * N2) / float(N1 + N2)
+    distances = np.arange(0.01, 1, 1/1000)
+    lamda = distances*(np.sqrt(N) + 0.12 + 0.11/np.sqrt(N))
+    alpha_c = np.zeros([len(distances)])
+    for value in lamda:
+        n = np.ogrid[1:101]
+        pvalue = 2*np.sum(((-1)**(n-1))*np.exp(-2*(value**2)*(n**2)))
+        pvalue = np.amin(np.amax(pvalue, initial=0), initial=1)
+        alpha_c[lamda == value] = pvalue
+    critical_distance = distances[alpha_c <= (alpha)]
+    return np.min(critical_distance)
+
+
+def ecdf_distance(S1, S2):
+    data1 = np.sort(S1.flatten())
+    data2 = np.sort(S2.flatten())
+    n1 = len(data1)
+    n2 = len(data2)
+    data_all = np.concatenate([data1, data2])
+    cdf1 = np.searchsorted(data1, data_all, side='right') / (1.0 * n1)
+    cdf2 = np.searchsorted(data2, data_all, side='right') / (1.0 * n2)
+    d = np.max(np.absolute(cdf1 - cdf2))
+    return d
+
