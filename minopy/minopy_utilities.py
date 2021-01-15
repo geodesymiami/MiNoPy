@@ -198,7 +198,7 @@ def read_image(image_file, box=None, band=1):
 ###############################################################################
 
 
-def corr2cov(corr_matrix = [],sigma = []):
+def corr2cov(corr_matrix=[], sigma=[]):
     """ Converts correlation matrix to covariance matrix if std of variables are known. """
 
     D = np.diagflat(sigma)
@@ -464,7 +464,7 @@ def simulate_coherence_matrix_exponential(t, gamma0, gammaf, Tau0, ph, seasonal=
 
 def simulate_noise(corr_matrix):
     nsar = corr_matrix.shape[0]
-    eigen_value, eigen_vector = np.linalg.eigh(corr_matrix)
+    eigen_value, eigen_vector = LA.eigh(corr_matrix)
     msk = (eigen_value < 1e-3)
     eigen_value[msk] = 0.
     # corr_matrix =  np.dot(eigen_vector, np.dot(np.diag(eigen_value), np.matrix.getH(eigen_vector)))
@@ -521,7 +521,7 @@ def est_corr(CCGsam):
 def custom_cmap(vmin=0, vmax=1):
     """ create a custom colormap based on visible portion of electromagnetive wave."""
 
-    from spectrumRGB import rgb
+    from minopy.spectrumRGB import rgb
     rgb = rgb()
     import matplotlib as mpl
     cmap = mpl.colors.ListedColormap(rgb)

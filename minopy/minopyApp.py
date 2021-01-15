@@ -26,7 +26,7 @@ from minsar.job_submission import JOB_SUBMIT
 import mintpy
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
 
-import minopy_utilities as mut
+import minopy.minopy_utilities as mut
 from minopy.objects.arg_parser import MinoPyParser
 from minopy.objects.slcStack import slcStack
 from minopy.defaults.auto_path import autoPath, PathFind

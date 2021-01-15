@@ -173,10 +173,10 @@ class slcStackDict:
             ds.attrs['MODIFICATION_TIME'] = str(time.time())
 
         ###############################
-        # 2D dataset containing reference and secondary dates of all pairs
+        # 1D dataset containing dates of all images
         dsName = 'dates'
         dsDataType = np.string_
-        dsShape = (self.numSlc, 2)
+        dsShape = (self.numSlc, 1)
         print('create dataset /{d:<{w}} of {t:<25} in size of {s}'.format(d=dsName,
                                                                           w=maxDigit,
                                                                           t=str(dsDataType),
