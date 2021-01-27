@@ -37,7 +37,7 @@ def main(iargs=None):
         metadata['defomax'] = inps.defo_max
         metadata['init_method'] = inps.init_method
         runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata)
-
+    
     return
 
 
@@ -127,7 +127,7 @@ class Snaphu:
 
     def get_nproc_tile(self):
 
-        nproc = np.min([64, multiprocessing.cpu_count()])
+        nproc = 16 #np.min([64, multiprocessing.cpu_count()])
 
         npixels = self.length * self.width
 
@@ -152,10 +152,9 @@ class Snaphu:
               '{unwrapped_file}'.format(config_file=self.config_file, wrapped_file=self.inp_wrapped,
                                         line_length=self.width, unwrapped_file=self.out_unwrapped)
         
-        p = subprocess.Popen(cmd, stdout=PIPE, stderr=PIPE)
+        p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, error = p.communicate()
-        #outs, errs  = subprocess.Popen(cmd, shell=True).communicate()
-        
+
         IML.renderISCEXML(self.out_unwrapped, bands=2, nyy=self.length, nxx=self.width,
                           datatype='float32', scheme='BIL')
 
@@ -172,7 +171,7 @@ class Snaphu:
                                           line_length=self.width, unwrapped_file=self.out_unwrapped, ytile=self.y_tile,
                                           xtile=self.x_tile, num_proc=self.nproc)
         
-        p = subprocess.Popen(cmd, stdout=PIPE, stderr=PIPE)
+        p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, error = p.communicate()
 
         IML.renderISCEXML(self.out_unwrapped, bands=2, nyy=self.length, nxx=self.width,

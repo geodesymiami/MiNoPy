@@ -15,7 +15,6 @@ pathObj = PathFind()
 CLUSTER_LIST = ['lsf', 'pbs', 'slurm', 'local']
 
 
-
 class MinoPyParser:
 
     def __init__(self, iargs=None, script=None):
@@ -28,7 +27,6 @@ class MinoPyParser:
                             help='walltime for submitting the script as a job')
         commonp.add_argument('--queue', dest='queue', default=None, help='Queue name')
         #commonp.add_argument('--submit', dest='submit_flag', action='store_true', help='submits job')
-
 
     def parse(self):
 
@@ -258,26 +256,32 @@ class MinoPyParser:
         parser = self.parser
         patch = parser.add_argument_group('Phase inversion option')
         patch.add_argument('-w', '--workDir', type=str, dest='work_dir', help='minopy directory')
-        patch.add_argument('-r', '--rangeWin', type=int, dest='range_window', default=15,
+        patch.add_argument('-r', '--rangeWin', type=str, dest='range_window', default=15,
                            help='range window size for shp finding')
-        patch.add_argument('-a', '--azimuthWin', type=int, dest='azimuth_window', default=15,
+        patch.add_argument('-a', '--azimuthWin', type=str, dest='azimuth_window', default=15,
                            help='azimuth window size for shp finding')
         patch.add_argument('-m', '--method', type=str, dest='inversion_method', default='EMI',
                            help='inversion method (EMI, EVD, PTA, sequential_EMI, ...)')
         patch.add_argument('-t', '--test', type=str, dest='shp_test', default='ks',
                            help='shp statistical test (ks, ad, ttest)')
-        patch.add_argument('-p', '--patchSize', type=int, dest='patch_size', default=200,
+        patch.add_argument('-p', '--patchSize', type=str, dest='patch_size', default=200,
                            help='azimuth window size for shp finding')
         patch.add_argument('-s', '--slcStack', type=str, dest='slc_stack', help='SLC stack file')
+        patch.add_argument('--mpi', dest='mpi_flag', action='store_true',
+                          help='run in parallel with mpi if true')
+        patch.add_argument('--unpatch', dest='unpatch_flag', action='store_true',
+                           help='Do not process because it has finished in last run, just do un-patching')
+        #patch.add_argument('-b', '--bbox', type=str, dest='bbox', default=None,
+        #                   help='subset area to process [x1, y1, x2, y2]')
        
-        par = parser.add_argument_group('parallel', 'parallel processing using dask')
-        par.add_argument('-c', '--cluster', '--cluster-type', dest='cluster', type=str,
-                         default='local', choices=CLUSTER_LIST + ['no'],
-                         help='Cluster to use for parallel computing, no to turn OFF. (default: %(default)s).')
-        par.add_argument('--num-worker', dest='numWorker', type=str, default='4',
-                         help='Number of workers to use (default: %(default)s).')
-        par.add_argument('--config', '--config-name', dest='config', type=str, default=None,
-                         help='Configuration name to use in dask.yaml (default: %(default)s).')
+        #par = parser.add_argument_group('parallel', 'parallel processing using dask')
+        #par.add_argument('-c', '--cluster', '--cluster-type', dest='cluster', type=str,
+        #                 default='local', choices=CLUSTER_LIST + ['no'],
+        #                 help='Cluster to use for parallel computing, no to turn OFF. (default: %(default)s).')
+        #par.add_argument('--num-worker', dest='numWorker', type=str, default='4',
+        #                 help='Number of workers to use (default: %(default)s).')
+        #par.add_argument('--config', '--config-name', dest='config', type=str, default=None,
+        #                 help='Configuration name to use in dask.yaml (default: %(default)s).')
         return parser
 
     @staticmethod
@@ -344,6 +348,7 @@ class MinoPyParser:
             'inversion',
             'ifgrams',
             'unwrap',
+            'write_correction_job',
             'load_int',
             'reference_point',
             'correct_unwrap_error',
@@ -413,6 +418,8 @@ class MinoPyParser:
                           help='end processing at the named step, default: {}'.format(STEP_LIST[-1]))
         step.add_argument('--dostep', dest='doStep', metavar='STEP',
                           help='run processing at the named step only')
+        step.add_argument('--norun', dest='norun_flag', action='store_true',
+                          help=' do not run jobs created in [inversion, ifgrams, unwrap] steps, only write them')
 
         return parser, STEP_LIST
 

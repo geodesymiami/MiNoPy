@@ -13,6 +13,7 @@ from scipy import linalg as LA
 from scipy.optimize import minimize
 from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind
 import gdal
+import isce
 import isceobj
 from mroipac.looks.Looks import Looks
 import glob
@@ -887,7 +888,7 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile):
     }
 
     ts_obj = timeseries(inps.timeseriesFile)
-    ts_obj.layout_hdf5(dsNameDict, metadata)
+    writefile.layout_hdf5(inps.timeseriesFile, dsNameDict, metadata)
 
     # write date time-series
     date_list_utf8 = [dt.encode('utf-8') for dt in date_list]

@@ -28,6 +28,8 @@ import minopy.objects.inversion_utils as iut
 from skimage.measure import label
 from isceobj.Util.ImageUtil import ImageLib as IML
 from mintpy.objects import cluster
+from mpi4py import MPI
+from math import ceil
 #################################
 
 
@@ -40,13 +42,46 @@ def main(iargs=None):
     inps = Parser.parse()
 
     inversionObj = PhaseLink(inps)
-    inversionObj.loop_patches()
-    inversionObj.close()
+
+    if inps.unpatch_flag:
+        inversionObj.unpatch()
+        inversionObj.close()
+
+    else:
+
+        box_list = []
+        for box in inversionObj.box_list:
+            index = inversionObj.box_list.index(box)
+            out_folder = inversionObj.out_dir + '/PATCHES/PATCH_{}'.format(index)
+            if not os.path.exists(out_folder + '/PATCHES/quality.npy'):
+                box_list.append(box)
+
+        if inps.mpi_flag:
+            comm = MPI.COMM_WORLD
+            rank = comm.Get_rank()
+            size = comm.Get_size()
+            np.random.seed(seed=rank)
+
+            if size > len(box_list):
+                num = 1
+            else:
+                num = ceil(len(box_list) // size)
+            print(len(box_list), num)
+            index = np.arange(0, len(box_list), num)
+            index[-1] = len(box_list)
+
+            if rank < len(index):
+                time_passed = inversionObj.loop_patches(box_list[index[rank]:index[rank+1]])
+                comm.gather(time_passed, root=0)
+        else:
+            inversionObj.loop_patches(inversionObj.box_list)
+
+        MPI.Finalize()
 
     return None
 
 
-def write_hdf5_block(fname, data, datasetName, block=None, mode='a', print_msg=True):
+def write_hdf5_block(fhandle, data, datasetName, block=None):
     """Write data to existing HDF5 dataset in disk block by block.
     Parameters: data        - np.ndarray 1/2/3D matrix
                 datasetName - str, dataset name
@@ -78,27 +113,20 @@ def write_hdf5_block(fname, data, datasetName, block=None, mode='a', print_msg=T
                      0, shape[1],
                      0, shape[2]]
 
-    # write
-    if print_msg:
-        print('-'*50)
-        print('open  HDF5 file {} in {} mode'.format(fname, mode))
-        print("writing dataset /{:<25} block: {}".format(datasetName, block))
-    with h5py.File(fname, mode) as f:
-        if len(block) == 6:
-            f[datasetName][block[0]:block[1],
-                           block[2]:block[3],
-                           block[4]:block[5]] = data
+    if len(block) == 6:
+        fhandle[datasetName][block[0]:block[1],
+                       block[2]:block[3],
+                       block[4]:block[5]] = data
 
-        elif len(block) == 4:
-            f[datasetName][block[0]:block[1],
-                           block[2]:block[3]] = data
+    elif len(block) == 4:
+        fhandle[datasetName][block[0]:block[1],
+                       block[2]:block[3]] = data
 
-        elif len(block) == 2:
-            f[datasetName][block[0]:block[1]] = data
+    elif len(block) == 2:
+        fhandle[datasetName][block[0]:block[1]] = data
 
-    if print_msg:
-        print('close HDF5 file {}.'.format(fname))
-    return fname
+    return
+
 
 def get_shp_row_col_f(data, input_slc, def_sample_rows, def_sample_cols, azimuth_window,
                       range_window, reference_row, reference_col, distance_threshold):
@@ -148,7 +176,7 @@ def get_shp_row_col_f(data, input_slc, def_sample_rows, def_sample_cols, azimuth
     return ksres, sample_rows[0], sample_cols[0]
 
 
-def process_patch_f(box=None, RSLCfile=None, range_window=None, azimuth_window=None, width=None, length=None,
+def process_patch_f(box=None, range_window=None, azimuth_window=None, width=None, length=None,
                     n_image=None, slcStackObj=None, distance_threshold=None, def_sample_rows=None,
                     def_sample_cols=None, reference_row=None, reference_col=None, phase_linking_method=None,
                     total_num_mini_stacks=None, default_mini_stack_size=None):
@@ -168,14 +196,11 @@ def process_patch_f(box=None, RSLCfile=None, range_window=None, azimuth_window=N
     rslc_ref = None
     patch_slc_images = None
 
-    with h5py.File(RSLCfile, 'r') as f:
-        quality = f['quality'][box[1]:box[3], box[0]:box[2]]
-
-    if not np.any(quality < 0):
-        return
-
     box_width = box[2] - box[0]
     box_length = box[3] - box[1]
+
+    rslc_ref = np.empty([n_image, box_length, box_width], dtype='complex')
+    quality = np.empty([box_length, box_width], dtype='float')
 
     big_box = iut.get_big_box(box, range_window, azimuth_window, width, length)
 
@@ -195,7 +220,6 @@ def process_patch_f(box=None, RSLCfile=None, range_window=None, azimuth_window=N
                      sam.T.reshape(overlap_length * overlap_width, 1)))
 
     patch_slc_images = slcStackObj.read(datasetName='slc', box=big_box)
-    rslc_ref = np.zeros([n_image, box_length, box_width], dtype='complex')
 
     def invert_coord_f(data):
         CCG = None
@@ -279,9 +303,13 @@ class PhaseLink:
         self.range_window = int(inps.range_window)
         self.azimuth_window = int(inps.azimuth_window)
         self.patch_size = int(inps.patch_size)
-        self.numWorker = int(inps.numWorker)
-        self.config = inps.config
-        self.cluster = inps.cluster
+        if inps.mpi_flag:
+            self.mpi_flag = True
+        else:
+            self.mpi_flag = False
+        #self.numWorker = int(inps.numWorker)
+        #self.config = inps.config
+        #self.cluster = inps.cluster
         self.out_dir = self.work_dir + '/inverted'
         os.makedirs(self.out_dir, exist_ok='True')
 
@@ -302,7 +330,7 @@ class PhaseLink:
         self.distance_thresh = mut.ks_lut(self.n_image, self.n_image, alpha=0.01)
 
         # split the area in to patches of size 'self.patch_size'
-        self.box_list, self.num_box = self.patch_slice
+        self.box_list, self.num_box = self.patch_slice(inps)
 
         # default number of images in each ministack
         self.mini_stack_default_size = 10
@@ -312,9 +340,8 @@ class PhaseLink:
             self.total_num_mini_stacks = 1
 
         self.sample_rows, self.sample_cols, self.reference_row, self.reference_col = self.window_for_shp()
-        self.total_num_mini_stacks = None
-        self.temp_prefix = os.path.basename(os.path.dirname(self.work_dir))
-        self.RSLCfile = '/tmp/{}_rslc_ref.h5'.format(self.temp_prefix)
+
+        self.RSLCfile = os.path.join(self.out_dir, 'rslc_ref.h5')
         self.patch_slc_images = None
 
         if 'sequential' in self.phase_linking_method:
@@ -356,8 +383,7 @@ class PhaseLink:
 
         return sample_rows, sample_cols, reference_row, reference_col
 
-    @property
-    def patch_slice(self):
+    def patch_slice(self, inps):
         """
         Slice the image into patches of size patch_size
         box = (x0 y0 x1 y1) = (col0, row0, col1, row1) for each patch with respect to the whole image
@@ -365,6 +391,7 @@ class PhaseLink:
         -------
 
         """
+
         patch_row_1 = np.arange(0, self.length - self.azimuth_window, self.patch_size, dtype=int)
         patch_row_2 = patch_row_1 + self.patch_size
         patch_row_2[-1] = self.length
@@ -417,13 +444,12 @@ class PhaseLink:
 
         return
 
-    def loop_patches(self):
+    def loop_patches(self, box_list):
+
 
         start_time = time.time()
 
-        self.initiate_output()
         data_kwargs = {
-            "RSLCfile" : self.RSLCfile,
             "range_window" : self.range_window,
             "azimuth_window" : self.azimuth_window,
             "width" : self.width,
@@ -440,22 +466,27 @@ class PhaseLink:
             "default_mini_stack_size" : self.mini_stack_default_size
         }
 
-        for box in self.box_list:
+        #self.mpi_flag = True
+        for box in box_list:
             data_kwargs['box'] = box
-            if self.cluster == 'no':
+            index = self.box_list.index(box)
+
+            out_folder = self.out_dir + '/PATCHES/PATCH_{}'.format(index)
+            os.makedirs(self.out_dir + '/PATCHES', exist_ok=True)
+            os.makedirs(out_folder, exist_ok=True)
+            if os.path.exists(out_folder + '/quality.npy'):
+                continue
+
+            if self.mpi_flag:
                 rslc_ref, quality = process_patch_f(**data_kwargs)[:-1]
             else:
+                # rslc_ref, quality = process_patch_f(**data_kwargs)[:-1]
                 box_width = box[2] - box[0]
                 box_length = box[3] - box[1]
-                rslc_ref = np.zeros([self.n_image, box_length, box_width], dtype='complex')
+                rslc_ref = np.empty([self.n_image, box_length, box_width], dtype='complex')
+                quality = np.empty([box_length, box_width], dtype='float')
 
-                with h5py.File(self.RSLCfile, 'r') as f:
-                    quality = f['quality'][box[1]:box[3], box[0]:box[2]]
-
-                if not np.any(quality < 0):
-                    continue
-
-                cluster_obj = cluster.DaskCluster(self.cluster, self.numWorker, config_name=self.config)
+                cluster_obj = cluster.DaskCluster('local', 4)
                 cluster_obj.open()
 
                 # run dask
@@ -466,56 +497,107 @@ class PhaseLink:
                 # close dask cluster and client
                 cluster_obj.close()
 
-            block = [0, self.n_image, box[1], box[3], box[0], box[2]]
-
-            # wrapped interferograms 3D
-            write_hdf5_block(fname=self.RSLCfile,
-                             data=rslc_ref,
-                             datasetName='slc',
-                             block=block)
-
-            # temporal coherence - 2D
-            block = [box[1], box[3], box[0], box[2]]
-            write_hdf5_block(fname=self.RSLCfile,
-                             data=quality,
-                             datasetName='quality',
-                             block=block)
+            np.save(out_folder + '/rslc_ref', rslc_ref)
+            np.save(out_folder + '/quality', quality)
 
         m, s = divmod(time.time() - start_time, 60)
         print('time used: {:02.0f} mins {:02.1f} secs.\n'.format(m, s))
+        return   # m, s
+
+    def unpatch(self):
+        if os.path.exists(self.RSLCfile):
+            print('rslc_ref.h5 exists, skip unpatching ...')
+
+        else:
+            self.initiate_output()
+            print('open  HDF5 file rslc_ref.h5 in a mode')
+            with h5py.File(self.RSLCfile, 'a') as fhandle:
+                for index, box in enumerate(self.box_list):
+                    patch_dir = self.out_dir + '/PATCHES/PATCH_{}'.format(index)
+                    rslc_ref = np.load(patch_dir + '/rslc_ref.npy')
+                    quality = np.load(patch_dir + '/quality.npy')
+
+                    print('-' * 50)
+                    print("unpatch block {}/{} : {}".format(index, self.num_box, box))
+
+                    # wrapped interferograms 3D
+                    block = [0, self.n_image, box[1], box[3], box[0], box[2]]
+                    write_hdf5_block(fhandle=fhandle,
+                                     data=rslc_ref,
+                                     datasetName='slc',
+                                     block=block)
+
+                    # temporal coherence - 2D
+                    block = [box[1], box[3], box[0], box[2]]
+                    write_hdf5_block(fhandle=fhandle,
+                                     data=quality,
+                                     datasetName='quality',
+                                     block=block)
+
+            print('close HDF5 file rslc_ref.h5.')
+
         return
 
     def close(self):
         if os.path.exists(self.RSLCfile):
+            import multiprocessing as mp
+            from functools import partial
 
-            with h5py.File(self.RSLCfile, 'a') as f:
-                for d, date in enumerate(self.all_date_list):
-                    wrap_date = os.path.join(self.out_dir, 'wrapped_phase', date)
-                    os.makedirs(wrap_date, exist_ok=True)
-                    out_name = os.path.join(wrap_date, date + '.slc')
-                    if not os.path.exists(out_name):
-                        out_rslc = np.memmap(out_name, dtype='complex64', mode='w+', shape=(self.length, self.width))
-                        out_rslc[:, :] = f['slc'][d, :, :]
-                        IML.renderISCEXML(out_name, bands=1, nyy=self.length, nxx=self.width, datatype='complex64', scheme='BSQ')
-                    else:
-                        IML.renderISCEXML(out_name, bands=1, nyy=self.length, nxx=self.width, datatype='complex64', scheme='BSQ')
+            print('open  HDF5 file rslc_ref.h5 in r mode')
 
-                quality_file = self.out_dir + '/quality'
-                if not os.path.exists(quality_file):
-                    quality_memmap = np.memmap(quality_file, mode='write', dtype='float32', shape=(self.length, self.width))
-                    IML.renderISCEXML(quality_file, bands=1, nyy=self.length, nxx=self.width, datatype='float32',
-                                      scheme='BIL')
-                else:
-                    quality_memmap = np.memmap(quality_file, mode='r+', dtype='float32', shape=(self.length, self.width))
+            num_cores = mp.cpu_count()
+            pool = mp.Pool(processes=num_cores)
+            date_list = self.all_date_list
+            out_dir = self.out_dir
+            width = self.width
+            length = self.length
+            RSLCfile = self.RSLCfile
+            func = partial(write_wrapped, date_list, out_dir, width, length, RSLCfile)
+            pool.map(func, self.all_date_list)
+            pool.close()
+            pool.join()
 
-                quality_memmap[:, :] = f['quality']
-                quality_memmap = None
+            print('open  HDF5 file rslc_ref.h5 in r mode')
+            fhandle = h5py.File(self.RSLCfile, 'r')
+            print('write quality file')
+            quality_file = self.out_dir + '/quality'
+            if not os.path.exists(quality_file):
+                quality_memmap = np.memmap(quality_file, mode='write', dtype='float32', shape=(self.length, self.width))
+                IML.renderISCEXML(quality_file, bands=1, nyy=self.length, nxx=self.width, datatype='float32',
+                                  scheme='BIL')
+            else:
+                quality_memmap = np.memmap(quality_file, mode='r+', dtype='float32', shape=(self.length, self.width))
 
-            command = 'mv {} {}'.format(self.RSLCfile, self.out_dir + '/rslc_ref.h5')
-            os.system(command)
+            quality_memmap[:, :] = fhandle['quality']
+            quality_memmap = None
+            print('close HDF5 file rslc_ref.h5.')
+
+            fhandle.close()
+
+        else:
+            print('rslc_ref.h5 does not exist!')
 
         return
 
+
+def write_wrapped(date_list, out_dir, width, length, RSLCfile, date):
+
+    d = date_list.index(date)
+    print('write wrapped_phase {}'.format(date))
+    wrap_date = os.path.join(out_dir, 'wrapped_phase', date)
+    os.makedirs(wrap_date, exist_ok=True)
+    out_name = os.path.join(wrap_date, date + '.slc')
+    if not os.path.exists(out_name):
+        fhandle = h5py.File(RSLCfile, 'r')
+        out_rslc = np.memmap(out_name, dtype='complex64', mode='w+', shape=(length, width))
+        out_rslc[:, :] = fhandle['slc'][d, :, :]
+        fhandle.close()
+        IML.renderISCEXML(out_name, bands=1, nyy=length, nxx=width, datatype='complex64',
+                          scheme='BSQ')
+    else:
+        IML.renderISCEXML(out_name, bands=1, nyy=length, nxx=width, datatype='complex64',
+                          scheme='BSQ')
+    return
 
 #################################################
 
