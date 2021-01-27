@@ -5,7 +5,6 @@
 import logging
 import warnings
 
-
 warnings.filterwarnings("ignore")
 
 mpl_logger = logging.getLogger('matplotlib')
@@ -52,8 +51,9 @@ STEP_LIST = [
     'geocode',
     'google_earth',
     'hdfeos5',
-    'plot',
-    'email',]
+    'plot',]
+
+#'email',]
 
 ##########################################################################
 
@@ -244,31 +244,46 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         if self.template['mintpy.subset.lalo'] == 'None' and self.template['mintpy.subset.yx'] == 'None':
             print('WARNING: No crop area given in mintpy.subset, the whole image is going to be used.')
             print('WARNING: May take days to process!')
-        else:
-            scp_args = '--template {}'.format(self.templateFile)
-            if self.customTemplateFile:
-                scp_args += ' {}'.format(self.customTemplateFile)
-            if self.project_name:
-                scp_args += ' --project {}'.format(self.project_name)
 
-            print('crop_images.py ', scp_args)
-            minopy.crop_images.main(scp_args.split())
+        scp_args = '--template {}'.format(self.templateFile)
+        if self.customTemplateFile:
+            scp_args += ' {}'.format(self.customTemplateFile)
+        if self.project_name:
+            scp_args += ' --project {}'.format(self.project_name)
+
+        print('crop_images.py ', scp_args)
+
+        os.makedirs(self.run_dir, exist_ok=True)
+        run_file_crop = os.path.join(self.run_dir, 'run_minopy_crop')
+        run_commands = ['crop_images.py ' + scp_args]
+
+        with open(run_file_crop, 'w+') as frun:
+            frun.writelines(run_commands)
+
+        inps = self.inps
+        inps.work_dir = self.run_dir
+        inps.out_dir = self.run_dir
+        inps.memory = 20000
+        inps.wall_time = '02:00'
+        job_obj = JOB_SUBMIT(inps)
+        job_obj.write_batch_jobs(batch_file=run_file_crop)
+
+        if not inps.norun_flag:
+            job_status = job_obj.submit_batch_jobs(batch_file=run_file_crop)
+
         return
 
     def run_phase_inversion(self, sname):
         """ Non-Linear phase inversion.
         """
-        if self.template['mintpy.compute.cluster'] is False:
-            self.template['mintpy.compute.cluster'] = 'no'
-        scp_args = '-w {a0} -r {a1} -a {a2} -m {a3} -t {a4} -p {a5} -s {a6} -c {a7} ' \
-                   '--num-worker {a8} '.format(a0=self.workDir, a1=self.template['MINOPY.inversion.range_window'],
-                                                 a2=self.template['MINOPY.inversion.azimuth_window'],
-                                                 a3=self.template['MINOPY.inversion.plmethod'],
-                                                 a4=self.template['MINOPY.inversion.shp_test'],
-                                                 a5=self.template['MINOPY.inversion.patch_size'],
-                                                 a6=os.path.join(self.workDir, 'inputs/slcStack.h5'),
-                                                 a7=self.template['mintpy.compute.cluster'],
-                                                 a8=self.template['mintpy.compute.numWorker'])
+
+        scp_args = '--workDir {a0} --rangeWin {a1} --azimuthWin {a2} --method {a3} --test {a4} ' \
+                   '--patchSize {a5} --slcStack {a6}'.format(a0=self.workDir, a1=self.template['MINOPY.inversion.range_window'],
+                                               a2=self.template['MINOPY.inversion.azimuth_window'],
+                                               a3=self.template['MINOPY.inversion.plmethod'],
+                                               a4=self.template['MINOPY.inversion.shp_test'],
+                                               a5=self.template['MINOPY.inversion.patch_size'],
+                                               a6=os.path.join(self.workDir, 'inputs/slcStack.h5'))
 
         if not self.inps.wall_time in ['None', None]:
             scp_args += '--walltime {} '.format(self.inps.wall_time)
@@ -276,10 +291,37 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             scp_args += '--queue {}'.format(self.inps.queue)
 
         print('phase_inversion.py ', scp_args)
-        minopy.phase_inversion.main(scp_args.split())
 
-        if self.azimuth_look * self.range_look > 1:
-            self.run_multilook('multilook')
+        inps = self.inps
+        inps.work_dir = self.run_dir
+        inps.out_dir = self.run_dir
+        inps.memory = int(self.template['MINOPY.parallel.job_memory'])
+        inps.wall_time = self.template['MINOPY.parallel.job_walltime']
+        num_nodes = int(self.template['MINOPY.parallel.num_nodes'])
+        num_workers = int(self.template['MINOPY.parallel.num_workers'])
+        job_name = 'run_phase_inversion'
+        job_file_name = 'run_phase_inversion_0'
+
+        if self.template['MINOPY.parallel.mpi']:
+
+            command_line = '\nmpirun -n {} python $MINOPY_HOME/minopy/phase_inversion.py {} --mpi'.format(num_workers,
+                                                                                                          scp_args)
+        else:
+            command_line = '\n$MINOPY_HOME/minopy/phase_inversion.py {}'.format(scp_args)
+
+        command_line += '\n$MINOPY_HOME/minopy/phase_inversion.py {} --unpatch'.format(scp_args)
+
+        job_obj = JOB_SUBMIT(inps)
+        job_obj.write_single_job_file(job_name, job_file_name, command_line,
+                                          work_dir=self.run_dir, number_of_nodes=num_nodes)
+
+        if not inps.norun_flag:
+            job_obj.submit_single_job(job_file_name, self.run_dir)
+
+        if not os.getenv('HOSTNAME').startswith('login'):
+            minopy.phase_inversion.main(scp_args.split())
+            scp_args += ' --unpatch {}'
+            minopy.phase_inversion.main(scp_args.split())
 
         return
 
@@ -365,7 +407,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         os.makedirs(self.run_dir, exist_ok=True)
         inps.ifgram_dir = self.ifgram_dir
         inps.template = self.template
-        run_ifgs = os.path.join(inps.run_dir, 'run_minopy_igram')
+        run_ifgs = os.path.join(inps.run_dir, 'run_01_minopy_ifgrams')
         run_commands = []
         wrapped_phase_dir = os.path.join(self.workDir, 'inverted', 'wrapped_phase')
 
@@ -391,11 +433,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         inps.work_dir = inps.run_dir
         inps.out_dir = inps.run_dir
-        inps.memory = 5000
-        inps.wall_time = '00:10'
         job_obj = JOB_SUBMIT(inps)
         job_obj.write_batch_jobs(batch_file=run_ifgs)
-        job_status = job_obj.submit_batch_jobs(batch_file=run_ifgs)
+
+        command = 'submit_jobs.bash {} --dostep 1'.format(self.templateFile)
+        print('jobs are written to {}*.job, you may submit with following command:'.format(run_ifgs))
+        print(command)
 
         return
 
@@ -446,18 +489,18 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         inps.ifgram_dir = self.ifgram_dir
         inps.ifgram_dir = inps.ifgram_dir + '_{}'.format(self.template['MINOPY.interferograms.type'])
         inps.template = self.template
-        run_file_unwrap = os.path.join(self.run_dir, 'run_minopy_unwrap')
+        run_file_unwrap = os.path.join(self.run_dir, 'run_02_minopy_unwrap')
         run_commands = []
         for pair in pairs:
             out_dir = os.path.join(inps.ifgram_dir, pair[0] + '_' + pair[1])
             os.makedirs(out_dir, exist_ok='True')
 
-            if self.azimuth_look * self.range_look > 1:
-                corr_file = os.path.join(self.workDir, 'inverted/quality_ml')
-            else:
-                corr_file = os.path.join(self.workDir, 'inverted/quality')
+            #if self.azimuth_look * self.range_look > 1:
+            #    corr_file = os.path.join(self.workDir, 'inverted/quality_ml')
+            #else:
+            #    corr_file = os.path.join(self.workDir, 'inverted/quality')
 
-            # os.path.join(out_dir, 'filt_fine.cor')
+            corr_file = os.path.join(out_dir, 'filt_fine.cor')
 
             scp_args = '--ifg {a1} --cor {a2} --unw {a3} --defoMax {a4} --initMethod {a5} ' \
                        '--reference {a6}\n'.format(a1=os.path.join(out_dir, 'filt_fine.int'),
@@ -475,11 +518,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         inps.work_dir = inps.run_dir
         inps.out_dir = inps.run_dir
-        inps.memory = 20000
-        inps.wall_time = '02:00'
         job_obj = JOB_SUBMIT(inps)
         job_obj.write_batch_jobs(batch_file=run_file_unwrap)
-        job_status = job_obj.submit_batch_jobs(batch_file=run_file_unwrap)
+
+        command = 'submit_jobs.bash {} --dostep 2'.format(self.templateFile)
+        print('jobs are written to {}*.job, you may submit with following command:'.format(run_file_unwrap))
+        print(command)
 
         return
 
@@ -565,6 +609,24 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         return
 
+    def write_correction_job(self, sname):
+        run_commands = ['minopyApp.py {} --start load_int'.format(self.templateFile)]
+        os.makedirs(self.run_dir, exist_ok=True)
+        run_file_corrections = os.path.join(self.run_dir, 'run_03_mintpy_corrections')
+
+        with open(run_file_corrections, 'w+') as frun:
+            frun.writelines(run_commands)
+
+        inps = self.inps
+        inps.work_dir = self.run_dir
+        inps.out_dir = self.run_dir
+        inps.memory = 20000
+        inps.wall_time = '02:00'
+        job_obj = JOB_SUBMIT(inps)
+        job_obj.write_batch_jobs(batch_file=run_file_corrections)
+
+        return
+
     def run(self, steps=STEP_LIST, plot=True):
         for sname in steps:
             print('\n\n******************** step - {} ********************'.format(sname))
@@ -583,6 +645,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
             elif sname == 'unwrap':
                 self.run_unwrap(sname)
+
+            elif sname == 'write_correction_job':
+                self.write_correction_job(sname)
 
             elif sname == 'load_int':
                 self.run_load_int(sname)

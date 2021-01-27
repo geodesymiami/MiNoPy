@@ -5,7 +5,6 @@
 import logging
 import warnings
 
-
 warnings.filterwarnings("ignore")
 
 mpl_logger = logging.getLogger('matplotlib')
@@ -20,8 +19,6 @@ import pickle
 from minopy.objects.arg_parser import MinoPyParser
 from minopy.objects import cluster_minopy
 import minopy.objects.inversion_utils as iut
-#import minopy.utils_numba as nbiut
-#import minopy.lib.utils_cy as ciut
 import gdal
 import time
 
@@ -57,8 +54,6 @@ def main(iargs=None):
     if inps.cluster == 'no':
         t0 = time.time()
         iut.parallel_invertion(**data_kwargs)
-        #nbiut.parallel_invertion(**data_kwargs)
-        #ciut.parallel_invertion(**data_kwargs)
         print('time spent: {} s'.format(time.time() - t0))
     else:
         # parallel
