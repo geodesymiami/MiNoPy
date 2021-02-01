@@ -289,8 +289,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             scp_args += '--walltime {} '.format(self.inps.wall_time)
         if self.inps.queue:
             scp_args += '--queue {}'.format(self.inps.queue)
-
-        print('phase_inversion.py ', scp_args)
+        scp_args2 = scp_args + ' --unpatch'
 
         inps = self.inps
         inps.work_dir = self.run_dir
@@ -312,16 +311,22 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         command_line += '\n$MINOPY_HOME/minopy/phase_inversion.py {} --unpatch'.format(scp_args)
 
         job_obj = JOB_SUBMIT(inps)
-        job_obj.write_single_job_file(job_name, job_file_name, command_line,
+
+
+        if os.getenv('HOSTNAME') is None or os.getenv('HOSTNAME').startswith('login') or job_obj.scheduler is None:
+            print('phase_inversion.py ', scp_args)
+            minopy.phase_inversion.main(scp_args.split())
+            print('phase_inversion.py ', scp_args2)
+            minopy.phase_inversion.main(scp_args2.split())
+
+        else:
+            print('phase_inversion.py ', scp_args)
+            job_obj.write_single_job_file(job_name, job_file_name, command_line,
                                           work_dir=self.run_dir, number_of_nodes=num_nodes)
 
-        if not inps.norun_flag:
-            job_obj.submit_single_job(job_file_name, self.run_dir)
+            if not inps.norun_flag:
+                job_obj.submit_single_job(job_file_name, self.run_dir)
 
-        if not os.getenv('HOSTNAME').startswith('login'):
-            minopy.phase_inversion.main(scp_args.split())
-            scp_args += ' --unpatch {}'
-            minopy.phase_inversion.main(scp_args.split())
 
         return
 

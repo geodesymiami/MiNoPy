@@ -1,12 +1,20 @@
-from setuptools import setup
+from distutils.core import setup
+from distutils.extension import Extension
 from Cython.Build import cythonize
+from Cython.Distutils import build_ext
+import numpy
+
+ext_modules=[
+    Extension("utils",       ["utils.pyx"], include_dirs=[numpy.get_include()]),
+    Extension("invert",      ["invert.pyx"], include_dirs=[numpy.get_include()]),
+]
 
 setup(
-    name='inversion_utils',
-    ext_modules=cythonize("inversion_utils.pyx"),
-    zip_safe=False,
-    script_args=["build_ext", "--inplace"]
+  name = 'inversion_utils',
+  script_args=["build_ext", "--inplace"],
+  ext_modules = cythonize(ext_modules),
 )
+
 
 
 '''
@@ -14,14 +22,8 @@ from distutils.core import setup
 from Cython.Build import cythonize
 from distutils.extension import Extension
 import numpy
-#include_dirs=[numpy.get_include()]
-#extensions = [Extension("utils_cy", ["utils_cy.pyx"], include_dirs=[numpy.get_include()])]
 
-#setup(name='utils_cy', ext_modules=cythonize(extensions), script_args=["build_ext", "--inplace"])
-
-# command: python3 setup.py build_ext --inplace
-
-extensions = [Extension("inversion_utils", ["inversion_utils.pyx"])]
+extensions = [Extension("inversion_utils", ["inversion_utils.pyx"], include_dirs=[numpy.get_include()])]
 
 setup(name='inversion_utils', ext_modules=cythonize(extensions), script_args=["build_ext", "--inplace"])
 '''
