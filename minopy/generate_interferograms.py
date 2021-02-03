@@ -26,14 +26,13 @@ def main(iargs=None):
     resampName = run_interferogram(inps)
 
     resampInt = resampName + '.int'
-    resampInt = os.path.dirname(resampInt) + '/filt_fine.int'
 
-    #filtInt = os.path.dirname(resampInt) + '/filt_fine.int'
-    #filter_strength = inps.filter_strength
-    #runFilter(resampInt, filtInt, filter_strength)
+    filtInt = os.path.dirname(resampInt) + '/filt_fine.int'
+    filter_strength = inps.filter_strength
+    runFilter(resampInt, filtInt, filter_strength)
 
     cor_file = os.path.dirname(resampInt) + '/filt_fine.cor'
-    estCoherence(resampInt, cor_file)
+    estCoherence(filtInt, cor_file)
 
     return
 
@@ -53,7 +52,7 @@ def run_interferogram(inps):
         length = slcs.shape[1]
         width = slcs.shape[2]
 
-        resampName = inps.out_dir + '/filt_fine'
+        resampName = inps.out_dir + '/fine'
         resampInt = resampName + '.int'
 
         ifg = np.memmap(resampInt, dtype=np.complex64, mode='w+', shape=(length, width))
@@ -78,6 +77,33 @@ def run_interferogram(inps):
         intImage.finalizeImage()
 
     return resampName
+
+
+def runFilter(infile, outfile, filterStrength):
+    from mroipac.filter.Filter import Filter
+
+    # Initialize the flattened interferogram
+    topoflatIntFilename = infile
+    intImage = isceobj.createIntImage()
+    intImage.load( infile + '.xml')
+    intImage.setAccessMode('read')
+    intImage.createImage()
+
+    # Create the filtered interferogram
+    filtImage = isceobj.createIntImage()
+    filtImage.setFilename(outfile)
+    filtImage.setWidth(intImage.getWidth())
+    filtImage.setAccessMode('write')
+    filtImage.createImage()
+
+    objFilter = Filter()
+    objFilter.wireInputPort(name='interferogram',object=intImage)
+    objFilter.wireOutputPort(name='filtered interferogram',object=filtImage)
+    objFilter.goldsteinWerner(alpha=filterStrength)
+
+    intImage.finalizeImage()
+    filtImage.finalizeImage()
+
 
 def estCoherence(outfile, corfile):
     from mroipac.icu.Icu import Icu
