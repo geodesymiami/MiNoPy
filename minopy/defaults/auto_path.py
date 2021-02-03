@@ -196,8 +196,8 @@ def get_auto_path(processor, work_dir, template=dict()):
 
     # read auto_path_dict
     if processor == 'isce':
-        if False:
-        #if len(input_h5) > 0:
+        #if False:
+        if len(input_h5) > 0:
             with h5py.File(input_h5[0]) as f:
                 metadata = dict(f.attrs)
             if metadata['beam_mode'] == 'SM':
@@ -263,4 +263,5 @@ def get_auto_path(processor, work_dir, template=dict()):
         template['MINOPY.load.baselineDir'] = os.path.join(work_dir, 'inputs/baselines')
 
     return template
+
 

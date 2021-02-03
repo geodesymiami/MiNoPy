@@ -7,11 +7,13 @@ import logging
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
 import os
+import isce
 import isceobj
 from isceobj.Image.IntImage import IntImage
 import numpy as np
 from minopy.objects.arg_parser import MinoPyParser
 import gdal
+import h5py
 
 
 def main(iargs=None):
@@ -24,13 +26,14 @@ def main(iargs=None):
     resampName = run_interferogram(inps)
 
     resampInt = resampName + '.int'
+    resampInt = os.path.dirname(resampInt) + '/filt_fine.int'
 
-    filtInt = os.path.dirname(resampInt) + '/filt_fine.int'
-    filter_strength = inps.filter_strength
-    runFilter(resampInt, filtInt, filter_strength)
+    #filtInt = os.path.dirname(resampInt) + '/filt_fine.int'
+    #filter_strength = inps.filter_strength
+    #runFilter(resampInt, filtInt, filter_strength)
 
     cor_file = os.path.dirname(resampInt) + '/filt_fine.cor'
-    estCoherence(filtInt, cor_file)
+    estCoherence(resampInt, cor_file)
 
     return
 
@@ -41,60 +44,40 @@ def run_interferogram(inps):
     else:
         extention = '.slc'
 
-    inps.reference = os.path.join(inps.reference, os.path.basename(inps.reference) + extention)
-    inps.secondary = os.path.join(inps.secondary, os.path.basename(inps.secondary) + extention)
+    with h5py.File(inps.stack_file, 'r') as ds:
+        date_list = np.array([x.decode('UTF-8') for x in ds['dates'][:]])
+        ref_ind = np.where(date_list==inps.reference)
+        sec_ind = np.where(date_list==inps.secondary)
 
-    ds = gdal.Open(inps.reference + '.vrt', gdal.GA_ReadOnly)
-    width = ds.RasterXSize
-    length = ds.RasterYSize
+        slcs =  ds['slc']
+        length = slcs.shape[1]
+        width = slcs.shape[2]
 
-    reference = np.memmap(inps.reference, dtype=np.complex64, mode='r', shape=(length, width))
-    secondary = np.memmap(inps.secondary, dtype=np.complex64, mode='r', shape=(length, width))
+        resampName = inps.out_dir + '/filt_fine'
+        resampInt = resampName + '.int'
 
-    resampName = inps.out_dir + '/fine'
-    resampInt = resampName + '.int'
+        ifg = np.memmap(resampInt, dtype=np.complex64, mode='w+', shape=(length, width))
 
-    ifg = np.memmap(resampInt, dtype=np.complex64, mode='w+', shape=(length, width))
+        for kk in range(length):
+            ifg[kk, :] = (slcs[ref_ind, kk, :] * np.conj(slcs[sec_ind, kk, :])).reshape(1, -1)
 
-    for kk in range(length):
-        ifg[kk, :] = reference[kk, :] * np.conj(secondary[kk, :])
 
-    obj_int = IntImage()
-    obj_int.setFilename(resampInt)
-    obj_int.setWidth(width)
-    obj_int.setLength(length)
-    obj_int.setAccessMode('READ')
-    obj_int.renderHdr()
-    obj_int.renderVRT()
+        obj_int = IntImage()
+        obj_int.setFilename(resampInt)
+        obj_int.setWidth(width)
+        obj_int.setLength(length)
+        obj_int.setAccessMode('READ')
+        obj_int.renderHdr()
+        obj_int.renderVRT()
+
+
+        intImage = isceobj.createIntImage()
+        intImage.load(resampInt + '.xml')
+        intImage.setAccessMode('read')
+        intImage.createImage()
+        intImage.finalizeImage()
 
     return resampName
-
-
-def runFilter(infile, outfile, filterStrength):
-    from mroipac.filter.Filter import Filter
-
-    # Initialize the flattened interferogram
-    topoflatIntFilename = infile
-    intImage = isceobj.createIntImage()
-    intImage.load( infile + '.xml')
-    intImage.setAccessMode('read')
-    intImage.createImage()
-
-    # Create the filtered interferogram
-    filtImage = isceobj.createIntImage()
-    filtImage.setFilename(outfile)
-    filtImage.setWidth(intImage.getWidth())
-    filtImage.setAccessMode('write')
-    filtImage.createImage()
-
-    objFilter = Filter()
-    objFilter.wireInputPort(name='interferogram',object=intImage)
-    objFilter.wireOutputPort(name='filtered interferogram',object=filtImage)
-    objFilter.goldsteinWerner(alpha=filterStrength)
-
-    intImage.finalizeImage()
-    filtImage.finalizeImage()
-
 
 def estCoherence(outfile, corfile):
     from mroipac.icu.Icu import Icu

@@ -6,6 +6,7 @@ ctypedef float float
 
 #ctypedef string STR
 
+cdef bint isnanc(float complex)
 cdef cnp.ndarray[int, ndim=1] get_big_box_cy(cnp.ndarray[int, ndim=1], int, int, int, int)
 cdef float cargf_r(float complex)
 cdef float[::1] absmat1(float complex[::1])
@@ -32,7 +33,7 @@ cdef float complex[:, ::1] cov2corr_cy(float complex[:,::1])
 cdef float complex[:,::1] transposemat2(float complex[:, :])
 cdef float complex[:,::1] est_corr_cy(float complex[:,::1])
 cdef float sum1d(float[::1])
-cdef float complex[::1] test_PS_cy(float complex[:, ::1])
+cdef tuple test_PS_cy(float complex[:, ::1])
 cdef float norm_complex(float complex[::1])
 cdef float complex[::1] squeeze_images(float complex[::1], float complex[:, ::1], cnp.intp_t)
 cdef tuple phase_linking_process_cy(float complex[:, ::1], int, bytes, bint)

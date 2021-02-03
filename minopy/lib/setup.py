@@ -1,12 +1,19 @@
 from distutils.core import setup
 from distutils.extension import Extension
 from Cython.Build import cythonize
-from Cython.Distutils import build_ext
+#from Cython.Distutils import build_ext
+#from setuptools import Extension, setup
+#from Cython.Build import cythonize
 import numpy
 
+#ext_modules=[
+#    Extension("utils",    ["utils.pyx"], include_dirs=[numpy.get_include()], extra_compile_args=['-fopenmp'], extra_link_args=['-fopenmp']),
+#    Extension("invert",   ["invert.pyx"], include_dirs=[numpy.get_include()]),
+#]
+
 ext_modules=[
-    Extension("utils",       ["utils.pyx"], include_dirs=[numpy.get_include()]),
-    Extension("invert",      ["invert.pyx"], include_dirs=[numpy.get_include()]),
+    Extension("utils",    ["utils.pyx"], include_dirs=[numpy.get_include()]),
+    Extension("invert",   ["invert.pyx"], include_dirs=[numpy.get_include()]),
 ]
 
 setup(

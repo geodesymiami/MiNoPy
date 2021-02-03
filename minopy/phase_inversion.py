@@ -39,7 +39,6 @@ def main(iargs=None):
 
     if inps.unpatch_flag:
         inversionObj.unpatch()
-        inversionObj.close()
 
     else:
 

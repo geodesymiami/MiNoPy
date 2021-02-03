@@ -327,6 +327,8 @@ class MinoPyParser:
                             help='Reference image')
         parser.add_argument('-s', '--secondary', type=str, dest='secondary', required=True,
                             help='Secondary image')
+        parser.add_argument('-t', '--stack', type=str, dest='stack_file', required=True,
+                            help='stack file to read from')
         parser.add_argument('-o', '--outdir', type=str, dest='out_dir', default='interferograms',
                             help='Prefix of output int and amp files')
         parser.add_argument('-a', '--alks', type=int, dest='azlooks', default=1,

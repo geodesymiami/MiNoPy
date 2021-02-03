@@ -422,12 +422,13 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
             scp_args = '--reference {a1} --secondary {a2} --outdir {a3} --alks {a4} ' \
                        '--rlks {a5} --filterStrength {a6} ' \
-                       '--prefix {a7}\n'.format(a1=os.path.join(wrapped_phase_dir, pair[0]),
-                                                a2=os.path.join(wrapped_phase_dir, pair[1]),
-                                                a3=out_dir, a4=self.azimuth_look,
-                                                a5=self.range_look,
-                                                a6=self.template['MINOPY.interferograms.filter_strength'],
-                                                a7=sensor_type)
+                       '--prefix {a7} --stack {a8}\n'.format(a1=pair[0],
+                                                             a2=pair[1],
+                                                             a3=out_dir, a4=self.azimuth_look,
+                                                             a5=self.range_look,
+                                                             a6=self.template['MINOPY.interferograms.filter_strength'],
+                                                             a7=sensor_type,
+                                                             a8=os.path.join(self.workDir, 'inverted/rslc_ref.h5'))
 
             cmd = 'generate_interferograms.py ' + scp_args
             # print(cmd)
@@ -500,12 +501,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             out_dir = os.path.join(inps.ifgram_dir, pair[0] + '_' + pair[1])
             os.makedirs(out_dir, exist_ok='True')
 
-            #if self.azimuth_look * self.range_look > 1:
-            #    corr_file = os.path.join(self.workDir, 'inverted/quality_ml')
-            #else:
-            #    corr_file = os.path.join(self.workDir, 'inverted/quality')
+            if self.azimuth_look * self.range_look > 1:
+                corr_file = os.path.join(self.workDir, 'inverted/quality_ml')
+            else:
+                corr_file = os.path.join(self.workDir, 'inverted/quality')
 
-            corr_file = os.path.join(out_dir, 'filt_fine.cor')
+            #corr_file = os.path.join(out_dir, 'filt_fine.cor')
 
             scp_args = '--ifg {a1} --cor {a2} --unw {a3} --defoMax {a4} --initMethod {a5} ' \
                        '--reference {a6}\n'.format(a1=os.path.join(out_dir, 'filt_fine.int'),

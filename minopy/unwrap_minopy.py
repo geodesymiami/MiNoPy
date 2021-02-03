@@ -9,6 +9,7 @@
 import os
 import h5py
 import multiprocessing
+import isce
 from isceobj.Util.ImageUtil import ImageLib as IML
 from minopy.objects.arg_parser import MinoPyParser
 import numpy as np
@@ -30,13 +31,17 @@ def main(iargs=None):
 
     try:
         if do_tiles:
+            print('1')
             unwObj.unwrap_tile()
         else:
+            print('2')
             unwObj.unwrap()
     except:
+        print('3')
         metadata['defomax'] = inps.defo_max
         metadata['init_method'] = inps.init_method
         runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata)
+
     
     return
 
@@ -151,6 +156,8 @@ class Snaphu:
         cmd = 'snaphu -f {config_file} -d {wrapped_file} {line_length} -o ' \
               '{unwrapped_file}'.format(config_file=self.config_file, wrapped_file=self.inp_wrapped,
                                         line_length=self.width, unwrapped_file=self.out_unwrapped)
+
+        print(cmd)
         
         p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, error = p.communicate()

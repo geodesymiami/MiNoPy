@@ -307,39 +307,6 @@ cdef class CPhaseLink:
                     # temporal coherence - 2D
                     block = [box[1], box[3], box[0], box[2]]
                     write_hdf5_block_2D(fhandle, quality, b'quality', block)
-
-            print('close HDF5 file rslc_ref.h5.')
-
-        return
-
-    def close(self):
-
-        cdef int num_cores, width, length
-        cdef object pool, func, fhandle
-        cdef list date_list
-        cdef bytes out_dir, RSLCfile, quality_file
-        cdef float[:, ::1] quality_memmap
-
-        if os.path.exists(self.RSLCfile.decode('UTF-8')):
-            import multiprocessing as mp
-            from functools import partial
-
-
-            print('open  HDF5 file rslc_ref.h5 in r mode')
-
-            num_cores = mp.cpu_count()
-            pool = mp.Pool(processes=num_cores)
-            date_list = self.all_date_list
-            out_dir = self.out_dir
-            width = self.width
-            length = self.length
-            RSLCfile = self.RSLCfile
-            func = partial(write_wrapped, date_list, out_dir, width, length, RSLCfile)
-            pool.map(func, self.all_date_list)
-            pool.close()
-            pool.join()
-
-            with h5py.File(self.RSLCfile.decode('UTF-8'), 'r') as fhandle:
                 print('write quality file')
                 quality_file = self.out_dir + b'/quality'
 
@@ -356,9 +323,7 @@ cdef class CPhaseLink:
                 quality_memmap = None
                 print('close HDF5 file rslc_ref.h5.')
 
-
-        else:
-            print('rslc_ref.h5 does not exist!')
+            print('close HDF5 file rslc_ref.h5.')
 
         return
 
