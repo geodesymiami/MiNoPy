@@ -52,7 +52,7 @@ def run_interferogram(inps):
         length = slcs.shape[1]
         width = slcs.shape[2]
 
-        resampName = inps.out_dir + '/fine'
+        resampName = inps.out_dir + '/filt_fine'
         resampInt = resampName + '.int'
 
         ifg = np.memmap(resampInt, dtype=np.complex64, mode='w+', shape=(length, width))
@@ -77,7 +77,6 @@ def run_interferogram(inps):
         intImage.finalizeImage()
 
     return resampName
-
 
 def runFilter(infile, outfile, filterStrength):
     from mroipac.filter.Filter import Filter
