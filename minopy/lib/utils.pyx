@@ -3,7 +3,7 @@
 cimport cython
 import numpy as np
 cimport numpy as cnp
-#from libc.stdio cimport printf
+from libc.stdio cimport printf
 from scipy import linalg as LA
 from scipy.linalg import lapack as lap
 from libc.math cimport sqrt, log, exp, isnan
@@ -172,51 +172,17 @@ cdef inline float complex[::1] multiplymat12(float complex[::1] x, float complex
     return out
 
 
-cdef inline bint is_semi_pos_def_chol_cy(float[:, ::1] x):
-    """ Checks the positive semi definitness of a matrix. """
-    cdef bint res
-
-    try:
-        LA.cholesky(x)
-        res = True
-    except:
-        res = False
-    return res
-
-
-cdef inline tuple regularize_matrix_cy(float[:, ::1] M):
-    """ Regularizes a matrix to make it positive semi definite. """
-    cdef bint status = False
-    cdef cnp.intp_t i, t = 0
-    cdef float[:, ::1] N = np.zeros((M.shape[0], M.shape[1]), dtype=np.float32)
-    cdef float en = 1e-6
-
-    for i in range(M.shape[0]):
-        for t in range(M.shape[1]):
-            N[i, t] = M[i, t]
-
-    while t < 500:
-        if is_semi_pos_def_chol_cy(N):
-            status = True
-            break
-        else:
-            for i in range(M.shape[0]):
-                N[i, i] += en
-                en *= 2
-                t += 1
-
-    return status, N
-
-
 cdef inline float complex[::1] EVD_phase_estimation_cy(float complex[:, ::1] coh0):
     """ Estimates the phase values based on eigen value decomosition """
     cdef float[::1] eigen_value
-    cdef cnp.ndarray[float complex, ndim=2] eigen_vector
+    #cdef cnp.ndarray[float complex, ndim=2] eigen_vector
+    cdef float complex[:, :] eigen_vector
     cdef float complex x0
     cdef cnp.intp_t i, n = coh0.shape[0]
     cdef float complex[::1] vec = np.empty(n, dtype=np.complex64)
 
     eigen_value, eigen_vector = lap.cheevr(coh0)[0:2]
+
     x0 = cexpf(1j * cargf_r(eigen_vector[0, n-1]))
     for i in range(n):
         vec[i] = eigen_vector[i, n-1] * conjf(x0)
@@ -224,29 +190,31 @@ cdef inline float complex[::1] EVD_phase_estimation_cy(float complex[:, ::1] coh
     return vec
 
 
-
 cdef inline float complex[::1] EMI_phase_estimation_cy(float complex[:, ::1] coh0):
     """ Estimates the phase values based on EMI decomosition (Homa Ansari, 2018 paper) """
-    cdef float[:,::1] abscoh = absmat2(coh0)
-    cdef bint stat
+    cdef float[:, ::1] abscoh = absmat2(coh0)
+    cdef float[:, :] invabscoh
+    cdef int stat
     cdef cnp.intp_t i, n = coh0.shape[0]
     cdef float complex[:, ::1] M
     cdef float[::1] eigen_value
-    cdef cnp.ndarray[float complex, ndim=2] eigen_vector
+    #cdef cnp.ndarray[float complex, ndim=2] eigen_vector
+    cdef float complex[:, :] eigen_vector
     cdef float complex[::1] vec = np.empty((n), dtype=np.complex64)
     cdef float complex x0
 
-    stat, abscoh = regularize_matrix_cy(abscoh)
+    stat = check_invert(abscoh)
 
-    if stat:
-        M = lap.cpotri(abscoh)[0] * coh0
+    if stat == 0:
+        invabscoh = inverse_float_matrix(abscoh)
+        M = multiply_elementwise_dc(invabscoh, coh0)
         eigen_value, eigen_vector = lap.cheevr(M)[0:2]
         x0 = cexpf(1j * cargf_r(eigen_vector[0, 0]))
         for i in range(n):
             vec[i] = eigen_vector[i, 0] * conjf(x0)
     else:
         vec = EVD_phase_estimation_cy(coh0)
-        print('warning: coherence matrix not positive semidifinite, It is switched from EMI to EVD')
+        #printf('warning: coherence matrix not positive semidifinite, It is switched from EMI to EVD')
     return vec
 
 
@@ -276,6 +244,11 @@ cdef inline float[::1] optimize_lbfgs(float[::1] x0, float complex[:, ::1] inver
 
     return out
 
+cdef inline int check_invert(float[:, ::1] x):
+    return lap.spotrf(x)[1]
+
+cdef inline float[:, :] inverse_float_matrix(float[:, ::1] x):
+    return lap.spotri(x)[0]
 
 cdef inline float complex[::1] PTA_L_BFGS_cy(float complex[:, ::1] coh0):
     """ Uses L-BFGS method to optimize PTA function and estimate phase values. """
@@ -284,27 +257,25 @@ cdef inline float complex[::1] PTA_L_BFGS_cy(float complex[:, ::1] coh0):
     cdef float[::1] x0, amp, res
     cdef float[:, ::1] abscoh = absmat2(coh0)
     cdef float[:, :] invabscoh
-    cdef bint stat
+    cdef int stat
     cdef float complex[:, ::1] inverse_gam
     cdef float complex[::1] vec = np.empty(n_image, dtype=np.complex64)
 
     x = EMI_phase_estimation_cy(coh0)
     x0 = angmat(x)
     amp = absmat1(x)
-    stat, abscoh = regularize_matrix_cy(abscoh)
-    if stat:
-        invabscoh = lap.spotri(abscoh)[0]
+
+    stat = check_invert(abscoh)
+    if stat == 0:
+        invabscoh = inverse_float_matrix(abscoh)
         inverse_gam = multiply_elementwise_dc(invabscoh, coh0)
         res = optimize_lbfgs(x0, inverse_gam)
         for i in range(n_image):
             vec[i] = amp[i] * cexpf(1j * res[i])
 
-        return vec
-
     else:
-
-        print('warning: coherence matrix not positive semidifinite, It is switched from PTA to EVD')
-        return EVD_phase_estimation_cy(coh0)
+        vec = EVD_phase_estimation_cy(coh0)
+    return vec
 
 
 cdef inline float complex[:,::1] outer_product(float complex[::1] x, float complex[::1] y):
@@ -801,19 +772,16 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     p = 0
     for i in range(num_points):
         data = (coords[i,0], coords[i,1])
-
+        print(data)
         shp = get_shp_row_col_c(data, patch_slc_images, def_sample_rows, def_sample_cols, azimuth_window,
                                 range_window, reference_row, reference_col, distance_threshold)
-
         num_shp = shp.shape[0]
 
         CCG = np.zeros((n_image, num_shp), dtype=np.complex64)
         for t in range(num_shp):
             for m in range(n_image):
                 CCG[m, t] = patch_slc_images[m, shp[t,0], shp[t,1]]
-
         coh_mat = est_corr_cy(CCG)
-
         if num_shp > 20:
 
             if len(phase_linking_method) > 10 and phase_linking_method[0:10] == b'sequential':
@@ -845,7 +813,8 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
         else:
             quality[data[0] - row1, data[1] - col1] = gam_pta_c(angmat2(coh_mat), vec_refined)
 
-        prog_bar.update(p+ 1, every=10, suffix='{}/{} pixels'.format(p + 1, num_points))
+        print(data, quality[data[0] - row1, data[1] - col1])
+        prog_bar.update(p + 1, every=10, suffix='{}/{} pixels'.format(p + 1, num_points))
         p += 1
 
     return rslc_ref, quality, box

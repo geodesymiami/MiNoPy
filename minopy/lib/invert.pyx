@@ -116,13 +116,13 @@ cdef class CPhaseLink:
         """
 
         if self.shp_test == b'ks':
-            self.shp_function = &iut.ks2smapletest_cy
+            self.shp_function = iut.ks2smapletest_cy
         elif self.shp_test == b'ad':
-            self.shp_function = &iut.ADtest_cy
+            self.shp_function = iut.ADtest_cy
         elif self.shp_test == b'ttest':
-            self.shp_function = &iut.ttest_indtest_cy
+            self.shp_function = iut.ttest_indtest_cy
         else:
-            self.shp_function = &iut.ks2smapletest_cy
+            self.shp_function = iut.ks2smapletest_cy
         return
 
     def patch_slice(self):

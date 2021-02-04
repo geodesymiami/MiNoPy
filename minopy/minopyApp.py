@@ -320,11 +320,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             minopy.phase_inversion.main(scp_args2.split())
 
         else:
+            os.makedirs(self.run_dir, exist_ok=True)
             print('phase_inversion.py ', scp_args)
             job_obj.write_single_job_file(job_name, job_file_name, command_line,
                                           work_dir=self.run_dir, number_of_nodes=num_nodes)
 
-            if not inps.norun_flag:
+            if not inps.norun_flag and os.getenv('HOSTNAME').startswith('login'):
                 job_obj.submit_single_job(job_file_name, self.run_dir)
 
 
