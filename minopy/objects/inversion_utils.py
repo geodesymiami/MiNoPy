@@ -336,6 +336,7 @@ def parallel_invertion(distance_thresh=None, azimuth_window=None, range_window=N
             rslc_ref[:, coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = vec_refined
             quality[coord[0]:coord[0] + 1, coord[1]:coord[1] + 1] = mut.gam_pta(np.angle(coh_mat),
                                                                                 vec_refined.reshape(-1, 1))
+            print('final quality:', quality[coord[0], coord[1]])
 
         return coord
 

@@ -82,6 +82,45 @@ def main(iargs=None):
     return
 
 
+def write_single_job_file(jobObj, job_name, job_file_name, command_line, work_dir=None, number_of_nodes=1, distribute=None):
+    """
+    Writes a job file for a single job.
+    :param job_name: Name of job.
+    :param job_file_name: Name of job file.
+    :param command_line: Command line containing process to run.
+    :param work_dir: working or output directory
+    """
+    import subprocess
+
+    # get lines to write in job file
+    job_file_lines = jobObj.get_job_file_lines(job_name, job_file_name, work_dir=work_dir,
+                                               number_of_nodes=number_of_nodes)
+    job_file_lines.append("\nfree")
+
+    if jobObj.scheduler == 'SLURM':
+        hostname = subprocess.Popen("hostname", shell=True, stdout=subprocess.PIPE).stdout.read().decode("utf-8")
+        job_file_lines.append("\nsmodule load python_cacher \n")
+        job_file_lines.append("export PYTHON_IO_CACHE_CWD=0\n")
+        job_file_lines.append("module load ooops\n")
+
+        if not distribute is None:
+            if 'stampede2' in hostname:
+                job_file_lines.append('\nexport CDTOOL=/scratch/01255/siliu/collect_distribute\n')
+            elif 'frontera' in hostname:
+                job_file_lines.append('\nexport CDTOOL=/scratch1/01255/siliu/collect_distribute\n')
+
+            job_file_lines.append('export PATH=${PATH}:${CDTOOL}/bin\n')
+            job_file_lines.append('distribute.bash ' + distribute + '\n')
+
+    job_file_lines.append("\n" + command_line + "\n")
+
+    # write lines to .job file
+    job_file_name = "{0}.job".format(job_file_name)
+    with open(os.path.join(work_dir, job_file_name), "w+") as job_file:
+        job_file.writelines(job_file_lines)
+
+    return
+
 class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
     """ Routine processing workflow for time series analysis of InSAR stacks with MiNoPy
         """
@@ -278,12 +317,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         """
 
         scp_args = '--workDir {a0} --rangeWin {a1} --azimuthWin {a2} --method {a3} --test {a4} ' \
-                   '--patchSize {a5} --slcStack {a6}'.format(a0=self.workDir, a1=self.template['MINOPY.inversion.range_window'],
+                   '--patchSize {a5}'.format(a0=self.workDir, a1=self.template['MINOPY.inversion.range_window'],
                                                a2=self.template['MINOPY.inversion.azimuth_window'],
                                                a3=self.template['MINOPY.inversion.plmethod'],
                                                a4=self.template['MINOPY.inversion.shp_test'],
-                                               a5=self.template['MINOPY.inversion.patch_size'],
-                                               a6=os.path.join(self.workDir, 'inputs/slcStack.h5'))
+                                               a5=self.template['MINOPY.inversion.patch_size'])
 
         if not self.inps.wall_time in ['None', None]:
             scp_args += '--walltime {} '.format(self.inps.wall_time)
@@ -294,6 +332,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         inps = self.inps
         inps.work_dir = self.run_dir
         inps.out_dir = self.run_dir
+        inps.custom_template_file = self.customTemplateFile
         inps.memory = int(self.template['MINOPY.parallel.job_memory'])
         inps.wall_time = self.template['MINOPY.parallel.job_walltime']
         num_nodes = int(self.template['MINOPY.parallel.num_nodes'])
@@ -314,6 +353,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
 
         if os.getenv('HOSTNAME') is None or os.getenv('HOSTNAME').startswith('login') or job_obj.scheduler is None:
+
+            scp_args = scp_args + ' --slcStack {a}'.format(a=os.path.join(self.workDir, 'inputs/slcStack.h5'))
             print('phase_inversion.py ', scp_args)
             minopy.phase_inversion.main(scp_args.split())
             print('phase_inversion.py ', scp_args2)
@@ -321,9 +362,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         else:
             os.makedirs(self.run_dir, exist_ok=True)
+            scp_args = scp_args + ' --slcStack {a}'.format(a='/tmp/slcStack.h5')
             print('phase_inversion.py ', scp_args)
+            command_line = command_line + ' --slcStack {a}'.format(a='/tmp/slcStack.h5')
             job_obj.write_single_job_file(job_name, job_file_name, command_line,
-                                          work_dir=self.run_dir, number_of_nodes=num_nodes)
+                                  work_dir=self.run_dir, number_of_nodes=num_nodes,
+                                  distribute=os.path.join(self.workDir, 'inputs/slcStack.h5'))
 
             if not inps.norun_flag and os.getenv('HOSTNAME').startswith('login'):
                 job_obj.submit_single_job(job_file_name, self.run_dir)
@@ -408,6 +452,14 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         # if reference_ind is False:
         #    pairs.append((date_list[0], date_list[-1]))
 
+        if os.getenv('HOSTNAME') is None or os.getenv('HOSTNAME').startswith('login') or job_obj.scheduler is None:
+            rslc_ref = os.path.join(self.workDir, 'inverted/rslc_ref.h5')
+            write_job = False
+        else:
+            rslc_ref = '/tmp/rslc_ref.h5'
+            write_job = True
+
+
         inps = self.inps
         inps.run_dir = self.run_dir
         os.makedirs(self.run_dir, exist_ok=True)
@@ -415,7 +467,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         inps.template = self.template
         run_ifgs = os.path.join(inps.run_dir, 'run_01_minopy_ifgrams')
         run_commands = []
-        wrapped_phase_dir = os.path.join(self.workDir, 'inverted', 'wrapped_phase')
 
         for pair in pairs:
             out_dir = os.path.join(ifgram_dir, pair[0] + '_' + pair[1])
@@ -429,7 +480,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                              a5=self.range_look,
                                                              a6=self.template['MINOPY.interferograms.filter_strength'],
                                                              a7=sensor_type,
-                                                             a8=os.path.join(self.workDir, 'inverted/rslc_ref.h5'))
+                                                             a8=rslc_ref)
 
             cmd = 'generate_interferograms.py ' + scp_args
             # print(cmd)
@@ -440,6 +491,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         inps.work_dir = inps.run_dir
         inps.out_dir = inps.run_dir
+        inps.custom_template_file = self.customTemplateFile
         job_obj = JOB_SUBMIT(inps)
         job_obj.write_batch_jobs(batch_file=run_ifgs)
 
@@ -496,18 +548,18 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         inps.ifgram_dir = self.ifgram_dir
         inps.ifgram_dir = inps.ifgram_dir + '_{}'.format(self.template['MINOPY.interferograms.type'])
         inps.template = self.template
-        run_file_unwrap = os.path.join(self.run_dir, 'run_02_minopy_unwrap')
+        run_file_unwrap = os.path.join(self.run_dir, 'run_02_minopy_un-wrap')
         run_commands = []
         for pair in pairs:
             out_dir = os.path.join(inps.ifgram_dir, pair[0] + '_' + pair[1])
             os.makedirs(out_dir, exist_ok='True')
 
-            if self.azimuth_look * self.range_look > 1:
-                corr_file = os.path.join(self.workDir, 'inverted/quality_ml')
-            else:
-                corr_file = os.path.join(self.workDir, 'inverted/quality')
+            #if self.azimuth_look * self.range_look > 1:
+            #    corr_file = os.path.join(self.workDir, 'inverted/quality_ml')
+            #else:
+            #    corr_file = os.path.join(self.workDir, 'inverted/quality')
 
-            #corr_file = os.path.join(out_dir, 'filt_fine.cor')
+            corr_file = os.path.join(out_dir, 'filt_fine.cor')
 
             scp_args = '--ifg {a1} --cor {a2} --unw {a3} --defoMax {a4} --initMethod {a5} ' \
                        '--reference {a6}\n'.format(a1=os.path.join(out_dir, 'filt_fine.int'),
@@ -525,6 +577,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         inps.work_dir = inps.run_dir
         inps.out_dir = inps.run_dir
+        inps.custom_template_file = self.customTemplateFile
         job_obj = JOB_SUBMIT(inps)
         job_obj.write_batch_jobs(batch_file=run_file_unwrap)
 

@@ -52,7 +52,7 @@ def run_interferogram(inps):
         length = slcs.shape[1]
         width = slcs.shape[2]
 
-        resampName = inps.out_dir + '/filt_fine'
+        resampName = inps.out_dir + '/fine'
         resampInt = resampName + '.int'
 
         ifg = np.memmap(resampInt, dtype=np.complex64, mode='w+', shape=(length, width))

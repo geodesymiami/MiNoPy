@@ -64,7 +64,7 @@ def main(iargs=None):
             index = np.arange(0, len(box_list), num)
             index[-1] = len(box_list)
 
-            if rank < len(index):
+            if rank < len(index) - 1:
                 time_passed = inversionObj.loop_patches(box_list[index[rank]:index[rank+1]])
                 comm.gather(time_passed, root=0)
         else:

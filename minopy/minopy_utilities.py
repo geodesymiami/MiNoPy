@@ -263,7 +263,22 @@ def regularize_matrix(M):
     return 0
 
 ###############################################################################
+def gam_pta_c(ph_filt, vec):
+    """ Returns squeesar PTA coherence between the initial and estimated phase vectors.
+    :param ph_filt: np.angle(coh) before inversion
+    :param vec_refined: refined complex vector after inversion
+    """
 
+    n = vec.shape[0]
+    ang_vec = np.angle(vec)
+    temp = 0
+    for i in range(n):
+        for k in range(i + 1, n):
+            temp += np.exp(1j * (ph_filt[i,k] - (ang_vec[i] - ang_vec[k])))
+
+    temp_coh = np.real(temp) * 2 /(n**2 - n)
+
+    return temp_coh
 
 def gam_pta(ph_filt, vec_refined):
     """ Returns squeesar PTA coherence between the initial and estimated phase vectors.
@@ -556,6 +571,8 @@ def phase_linking_process(ccg_sample, stepp, method, squeez=True):
         res = EVD_phase_estimation(coh_mat)
 
     res = res.reshape(len(res), 1)
+
+    print(gam_pta_c(np.angle(coh_mat), res))
 
     if squeez:
 

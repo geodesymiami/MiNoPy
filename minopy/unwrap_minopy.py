@@ -161,6 +161,8 @@ class Snaphu:
         
         p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, error = p.communicate()
+        if len(error) > 0:
+            raise RuntimeError(error) from exc
 
         IML.renderISCEXML(self.out_unwrapped, bands=2, nyy=self.length, nxx=self.width,
                           datatype='float32', scheme='BIL')
@@ -173,13 +175,16 @@ class Snaphu:
     def unwrap_tile(self):
 
         cmd = 'snaphu -f {config_file} -d {wrapped_file} {line_length} -o ' \
-              '{unwrapped_file} --tile {ytile} {xtile} 500 500 ' \
+              '{unwrapped_file} --tile {ytile} {xtile} 200 200 ' \
               '--nproc {num_proc}'.format(config_file=self.config_file, wrapped_file=self.inp_wrapped,
                                           line_length=self.width, unwrapped_file=self.out_unwrapped, ytile=self.y_tile,
                                           xtile=self.x_tile, num_proc=self.nproc)
+        print(cmd)
         
         p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, error = p.communicate()
+        if len(error) > 0:
+            raise RuntimeError(error) from exc
 
         IML.renderISCEXML(self.out_unwrapped, bands=2, nyy=self.length, nxx=self.width,
                           datatype='float32', scheme='BIL')
