@@ -355,6 +355,7 @@ class MinoPyParser:
             'reference_point',
             'correct_unwrap_error',
             'write_to_timeseries',
+            'correct_SET',
             'correct_troposphere',
             'deramp',
             'correct_topography',

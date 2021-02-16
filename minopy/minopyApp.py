@@ -42,6 +42,7 @@ STEP_LIST = [
     'reference_point',
     'correct_unwrap_error',
     'write_to_timeseries',
+    'correct_SET',
     'correct_troposphere',
     'deramp',
     'correct_topography',
@@ -469,36 +470,51 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         run_ifgs = os.path.join(inps.run_dir, 'run_01_minopy_ifgrams')
         run_commands = []
 
+        num_cpu = os.cpu_count()
+        num_lin = 0
         for pair in pairs:
             out_dir = os.path.join(ifgram_dir, pair[0] + '_' + pair[1])
             os.makedirs(out_dir, exist_ok='True')
 
             scp_args = '--reference {a1} --secondary {a2} --outdir {a3} --alks {a4} ' \
                        '--rlks {a5} --filterStrength {a6} ' \
-                       '--prefix {a7} --stack {a8}\n'.format(a1=pair[0],
-                                                             a2=pair[1],
-                                                             a3=out_dir, a4=self.azimuth_look,
-                                                             a5=self.range_look,
-                                                             a6=self.template['MINOPY.interferograms.filter_strength'],
-                                                             a7=sensor_type,
-                                                             a8=rslc_ref)
+                       '--prefix {a7} --stack {a8}'.format(a1=pair[0],
+                                                           a2=pair[1],
+                                                           a3=out_dir, a4=self.azimuth_look,
+                                                           a5=self.range_look,
+                                                           a6=self.template['MINOPY.interferograms.filter_strength'],
+                                                           a7=sensor_type,
+                                                           a8=rslc_ref)
 
             cmd = 'generate_interferograms.py ' + scp_args
-            # print(cmd)
-            run_commands.append(cmd)
+            if write_job is False:
+                cmd = cmd + ' &\n'
+                run_commands.append(cmd)
+                num_lin += 1
+                if num_lin == num_cpu:
+                    run_commands.append('wait\n\n')
+                    num_lin = 0
+            else:
+                cmd = cmd + '\n'
+                run_commands.append(cmd)
+
 
         with open(run_ifgs, 'w+') as frun:
             frun.writelines(run_commands)
 
-        inps.work_dir = inps.run_dir
-        inps.out_dir = inps.run_dir
-        inps.custom_template_file = self.customTemplateFile
-        job_obj = JOB_SUBMIT(inps)
-        job_obj.write_batch_jobs(batch_file=run_ifgs)
+        if write_job:
+            inps.work_dir = inps.run_dir
+            inps.out_dir = inps.run_dir
+            inps.custom_template_file = self.customTemplateFile
+            job_obj = JOB_SUBMIT(inps)
+            job_obj.write_batch_jobs(batch_file=run_ifgs)
 
-        command = 'submit_jobs.bash {} --dostep 1'.format(self.templateFile)
-        print('jobs are written to {}*.job, you may submit with following command:'.format(run_ifgs))
-        print(command)
+        else:
+            os.system('chmod +x {}'.format(run_ifgs))
+            os.system(run_ifgs)
+        #command = 'submit_jobs.bash {} --dostep 1'.format(self.templateFile)
+        #print('jobs are written to {}*.job, you may submit with following command:'.format(run_ifgs))
+        #print(command)
 
         return
 
@@ -543,6 +559,14 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         # if reference_ind is False:
         #    pairs.append((date_list[0], date_list[-1]))
 
+        if os.getenv('HOSTNAME') is None or os.getenv('HOSTNAME').startswith('login') or job_obj.scheduler is None:
+            rslc_ref = os.path.join(self.workDir, 'inverted/rslc_ref.h5')
+            write_job = False
+        else:
+            rslc_ref = '/tmp/rslc_ref.h5'
+            write_job = True
+
+
         inps = self.inps
         inps.run_dir = self.run_dir
         os.makedirs(self.run_dir, exist_ok=True)
@@ -551,6 +575,10 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         inps.template = self.template
         run_file_unwrap = os.path.join(self.run_dir, 'run_02_minopy_un-wrap')
         run_commands = []
+
+        num_cpu = os.cpu_count()
+        num_lin = 0
+
         for pair in pairs:
             out_dir = os.path.join(inps.ifgram_dir, pair[0] + '_' + pair[1])
             os.makedirs(out_dir, exist_ok='True')
@@ -563,28 +591,44 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             corr_file = os.path.join(out_dir, 'filt_fine.cor')
 
             scp_args = '--ifg {a1} --cor {a2} --unw {a3} --defoMax {a4} --initMethod {a5} ' \
-                       '--reference {a6}\n'.format(a1=os.path.join(out_dir, 'filt_fine.int'),
+                       '--reference {a6}'.format(a1=os.path.join(out_dir, 'filt_fine.int'),
                                                    a2=corr_file,
                                                    a3=os.path.join(out_dir, 'filt_fine.unw'),
                                                    a4=self.template['MINOPY.unwrap.defomax'],
                                                    a5=self.template['MINOPY.unwrap.init_method'],
-                                                   a6=slc_file)
+                                                   a6=rslc_ref)
             cmd = 'unwrap_minopy.py ' + scp_args
+
+            if write_job is False:
+                cmd = cmd + ' &\n'
+                run_commands.append(cmd)
+                num_lin += 1
+                if num_lin == num_cpu:
+                    run_commands.append('wait\n\n')
+                    num_lin = 0
+            else:
+                cmd = cmd + '\n'
+                run_commands.append(cmd)
+
             # print(cmd)
             run_commands.append(cmd)
 
         with open(run_file_unwrap, 'w+') as frun:
             frun.writelines(run_commands)
 
-        inps.work_dir = inps.run_dir
-        inps.out_dir = inps.run_dir
-        inps.custom_template_file = self.customTemplateFile
-        job_obj = JOB_SUBMIT(inps)
-        job_obj.write_batch_jobs(batch_file=run_file_unwrap)
+        if write_job:
+            inps.work_dir = inps.run_dir
+            inps.out_dir = inps.run_dir
+            inps.custom_template_file = self.customTemplateFile
+            job_obj = JOB_SUBMIT(inps)
+            job_obj.write_batch_jobs(batch_file=run_file_unwrap)
+        else:
+            os.system('chmod +x {}'.format(run_file_unwrap))
+            os.system(run_file_unwrap)
 
-        command = 'submit_jobs.bash {} --dostep 2'.format(self.templateFile)
-        print('jobs are written to {}*.job, you may submit with following command:'.format(run_file_unwrap))
-        print(command)
+        #command = 'submit_jobs.bash {} --dostep 2'.format(self.templateFile)
+        #print('jobs are written to {}*.job, you may submit with following command:'.format(run_file_unwrap))
+        #print(command)
 
         return
 
@@ -728,6 +772,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
             elif sname == 'write_to_timeseries':
                 self.write_to_timeseries(sname)
+
+            elif sname == 'correct_SET':
+                super().run_solid_earth_tides_correction(sname)
 
             elif sname == 'correct_troposphere':
                 super().run_tropospheric_delay_correction(sname)

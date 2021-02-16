@@ -871,7 +871,7 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile):
     stack_obj.open(print_msg=False)
 
     date12_list = stack_obj.get_date12_list(dropIfgram=True)
-    date_list = stack_obj.get_date_list(dropIfgram=False)
+    date_list = stack_obj.get_date_list(dropIfgram=True)
 
     if template['MINOPY.interferograms.referenceDate']:
         reference_date = template['MINOPY.interferograms.referenceDate']
@@ -884,7 +884,7 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile):
         reference_ind = date_list.index(reference_date)
 
     # 1.2 design matrix
-    A = stack_obj.get_design_matrix4timeseries(date12_list=date12_list, refDate=reference_date)[0]
+    A = stack_obj.get_design_matrix4timeseries(date12_list)[0]
     num_ifgram, num_date = A.shape[0], A.shape[1] + 1
     inps.numIfgram = num_ifgram
     length, width = stack_obj.length, stack_obj.width
@@ -951,7 +951,7 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile):
 
     ref_phase = stack_obj.get_reference_phase(unwDatasetName=unwDatasetName,
                                               skip_reference=True,
-                                              dropIfgram=False)
+                                              dropIfgram=True)
 
     phase2range = -1 * float(metadata['WAVELENGTH']) / (4. * np.pi)
 
