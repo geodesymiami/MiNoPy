@@ -27,7 +27,8 @@ cdef extern from "complex.h":
     float fmaxf(float x, float y)
 
 cdef inline bint isnanc(float complex x):
-    return isnan(crealf(x)) or isnan(cimagf(x))
+    cdef bint res = isnan(crealf(x)) or isnan(cimagf(x))
+    return res
 
 cdef inline float cargf_r(float complex z):
     cdef float res
@@ -57,7 +58,7 @@ cdef cnp.ndarray[int, ndim=1] get_big_box_cy(cnp.ndarray[int, ndim=1] box, int r
 cdef inline float[::1] absmat1(float complex[::1] x):
     cdef cnp.intp_t i
     cdef cnp.intp_t n = x.shape[0]
-    cdef float[::1] y = np.empty((n), dtype=np.float32)
+    cdef float[::1] y = np.zeros(n, dtype=np.float32)
 
     for i in range(n):
             y[i] = cabsf(x[i])
@@ -67,7 +68,7 @@ cdef inline float[:, ::1] absmat2(float complex[:, ::1] x):
     cdef cnp.intp_t i, j
     cdef cnp.intp_t n1 = x.shape[0]
     cdef cnp.intp_t n2 = x.shape[1]
-    cdef float[:, ::1] y = np.empty((n1, n2), dtype=np.float32)
+    cdef float[:, ::1] y = np.zeros((n1, n2), dtype=np.float32)
 
     for i in range(n1):
         for j in range(n2):
@@ -77,7 +78,7 @@ cdef inline float[:, ::1] absmat2(float complex[:, ::1] x):
 cdef inline float[::1] angmat(float complex[::1] x):
     cdef cnp.intp_t i
     cdef cnp.intp_t n = x.shape[0]
-    cdef float[::1] y = np.empty((n), dtype=np.float32)
+    cdef float[::1] y = np.zeros(n, dtype=np.float32)
 
     for i in range(n):
             y[i] = cargf_r(x[i])
@@ -87,7 +88,7 @@ cdef inline float[:, ::1] angmat2(float complex[:, ::1] x):
     cdef cnp.intp_t i, t
     cdef cnp.intp_t n1 = x.shape[0]
     cdef cnp.intp_t n2 = x.shape[1]
-    cdef float[:, ::1] y = np.empty((n1, n2), dtype=np.float32)
+    cdef float[:, ::1] y = np.zeros((n1, n2), dtype=np.float32)
 
     for i in range(n1):
         for t in range(n2):
@@ -97,7 +98,7 @@ cdef inline float[:, ::1] angmat2(float complex[:, ::1] x):
 cdef inline float complex[::1] expmati(float[::1] x):
     cdef cnp.intp_t i
     cdef cnp.intp_t n = x.shape[0]
-    cdef float complex[::1] y = np.empty(n, dtype=np.complex64)
+    cdef float complex[::1] y = np.zeros(n, dtype=np.complex64)
 
     for i in range(n):
             y[i] = cexpf(1j * x[i])
@@ -107,20 +108,20 @@ cdef inline float complex[::1] expmati(float[::1] x):
 cdef inline float complex[::1] conjmat1(float complex[::1] x):
     cdef cnp.intp_t i
     cdef cnp.intp_t n = x.shape[0]
-    cdef float complex[::1] y = np.empty(n, dtype=np.complex64)
+    cdef float complex[::1] y = np.zeros(n, dtype=np.complex64)
 
     for i in range(n):
             y[i] = conjf(x[i])
     return y
 
 cdef inline float complex[:,::1] conjmat2(float complex[:,::1] x):
-    cdef cnp.intp_t i, j
+    cdef cnp.intp_t i, t
     cdef cnp.intp_t n1 = x.shape[0]
     cdef cnp.intp_t n2 = x.shape[1]
-    cdef float complex[:, ::1] y = np.empty((n1, n2), dtype=np.complex64)
+    cdef float complex[:, ::1] y = np.zeros((n1, n2), dtype=np.complex64)
     for i in range(n1):
-        for j in range(n2):
-            y[i, j] = conjf(x[i, j])
+        for t in range(n2):
+            y[i, t] = conjf(x[i, t])
     return y
 
 
@@ -164,7 +165,7 @@ cdef inline float complex[::1] multiplymat12(float complex[::1] x, float complex
     cdef cnp.intp_t s1 = x.shape[0]
     cdef cnp.intp_t s2 = y.shape[1]
     cdef float complex[::1] out = np.zeros(s2, dtype=np.complex64)
-    cdef cnp.intp_t i, t, m
+    cdef cnp.intp_t i, t
 
     for i in range(s2):
         for t in range(s1):
@@ -179,7 +180,7 @@ cdef inline float complex[::1] EVD_phase_estimation_cy(float complex[:, ::1] coh
     cdef float complex[:, :] eigen_vector
     cdef float complex x0
     cdef cnp.intp_t i, n = coh0.shape[0]
-    cdef float complex[::1] vec = np.empty(n, dtype=np.complex64)
+    cdef float complex[::1] vec = np.zeros(n, dtype=np.complex64)
 
     eigen_value, eigen_vector = lap.cheevr(coh0)[0:2]
 
@@ -192,14 +193,13 @@ cdef inline float complex[::1] EVD_phase_estimation_cy(float complex[:, ::1] coh
 
 cdef inline float complex[::1] EMI_phase_estimation_cy(float complex[:, ::1] coh0, float[:, ::1] abscoh):
     """ Estimates the phase values based on EMI decomosition (Homa Ansari, 2018 paper) """
-    #cdef float[:, ::1] abscoh = absmat2(coh0)
     cdef float[:, :] invabscoh
     cdef int stat
     cdef cnp.intp_t i, n = coh0.shape[0]
     cdef float complex[:, ::1] M
     cdef float[::1] eigen_value
     cdef float complex[:, :] eigen_vector
-    cdef float complex[::1] vec = np.empty((n), dtype=np.complex64)
+    cdef float complex[::1] vec = np.zeros((n), dtype=np.complex64)
     cdef float complex x0
 
     invabscoh = inverse_float_matrix(abscoh)
@@ -210,25 +210,10 @@ cdef inline float complex[::1] EMI_phase_estimation_cy(float complex[:, ::1] coh
             vec[i] = eigen_vector[i, 0] * conjf(x0)
 
     return vec
-'''
-    stat = check_invert(abscoh)
-    print(stat)
 
-    if stat == 0:
-        invabscoh = inverse_float_matrix(abscoh)
-        M = multiply_elementwise_dc(invabscoh, coh0)
-        eigen_value, eigen_vector = lap.cheevr(M)[0:2]
-        x0 = cexpf(1j * cargf_r(eigen_vector[0, 0]))
-        for i in range(n):
-            vec[i] = eigen_vector[i, 0] * conjf(x0)
-    else:
-        vec = EVD_phase_estimation_cy(coh0)
-        printf('\nwarning: coherence matrix not positive semidifinite, It is switched from EMI to EVD')
-    return vec
-'''
 
 cpdef inline double optphase_cy(double[::1] x0, float complex[:, ::1] inverse_gam):
-    cdef cnp.intp_t n, i
+    cdef cnp.intp_t n
     cdef float complex[::1] x
     cdef float complex[::1] y
     cdef float complex u = 0
@@ -255,7 +240,6 @@ cdef inline float[::1] optimize_lbfgs(float[::1] x0, float complex[:, ::1] inver
 
 cpdef int check_invert(float[:, ::1] x):
     cdef int stat = lap.spotrf(x)[1]
-    print(lap.spotrf(x))
     return stat
 
 cpdef float[:, :] inverse_float_matrix(float[:, ::1] x):
@@ -267,11 +251,10 @@ cdef inline float complex[::1] PTA_L_BFGS_cy(float complex[:, ::1] coh0, float[:
     cdef cnp.intp_t i, n_image = coh0.shape[0]
     cdef float complex[::1] x
     cdef float[::1] x0, amp, res
-    #cdef float[:, ::1] abscoh = absmat2(coh0)
     cdef float[:, :] invabscoh
     cdef int stat
     cdef float complex[:, ::1] inverse_gam
-    cdef float complex[::1] vec = np.empty(n_image, dtype=np.complex64)
+    cdef float complex[::1] vec = np.zeros(n_image, dtype=np.complex64)
 
     x = EMI_phase_estimation_cy(coh0, abscoh)
     x0 = angmat(x)
@@ -285,24 +268,10 @@ cdef inline float complex[::1] PTA_L_BFGS_cy(float complex[:, ::1] coh0, float[:
 
     return vec
 
-'''
-    stat = check_invert(abscoh)
-    print(stat)
-    if stat == 0:
-        invabscoh = inverse_float_matrix(abscoh)
-        inverse_gam = multiply_elementwise_dc(invabscoh, coh0)
-        res = optimize_lbfgs(x0, inverse_gam)
-        for i in range(n_image):
-            vec[i] = amp[i] * cexpf(1j * res[i])
-
-    else:
-        vec = EVD_phase_estimation_cy(coh0)
-    return vec
-'''
 
 cdef inline float complex[:,::1] outer_product(float complex[::1] x, float complex[::1] y):
     cdef cnp.intp_t i, t, n = x.shape[0]
-    cdef float complex[:, ::1] out = np.empty((n, n), dtype=np.complex64)
+    cdef float complex[:, ::1] out = np.zeros((n, n), dtype=np.complex64)
     for i in range(n):
         for t in range(n):
             out[i, t] = x[i] * y[t]
@@ -313,7 +282,7 @@ cdef inline float complex[:,::1] divide_elementwise(float complex[:, ::1] x, flo
     cdef cnp.intp_t i, t
     cdef cnp.intp_t n1 = x.shape[0]
     cdef cnp.intp_t n2 = x.shape[1]
-    cdef float complex[:, ::1] out = np.empty((n1, n2), dtype=np.complex64)
+    cdef float complex[:, ::1] out = np.zeros((n1, n2), dtype=np.complex64)
     for i in range(n1):
         for t in range(n2):
             if x[i, t] == 0:
@@ -325,7 +294,7 @@ cdef inline float complex[:,::1] divide_elementwise(float complex[:, ::1] x, flo
 cdef inline float complex[:, ::1] cov2corr_cy(float complex[:,::1] cov_matrix):
     """ Converts covariance matrix to correlation/coherence matrix. """
     cdef cnp.intp_t i, n = cov_matrix.shape[0]
-    cdef float complex[::1] v = np.empty(n, dtype=np.complex64)
+    cdef float complex[::1] v = np.zeros(n, dtype=np.complex64)
     cdef float complex[:, ::1] outer_v, corr_matrix
 
     for i in range(n):
@@ -342,7 +311,7 @@ cdef inline float complex[:,::1] transposemat2(float complex[:, :] x):
     cdef cnp.intp_t i, j
     cdef cnp.intp_t n1 = x.shape[0]
     cdef cnp.intp_t n2 = x.shape[1]
-    cdef float complex[:, ::1] y = np.empty((n2, n1), dtype=np.complex64)
+    cdef float complex[:, ::1] y = np.zeros((n2, n1), dtype=np.complex64)
     for i in range(n1):
         for j in range(n2):
             y[j, i] = x[i, j]
@@ -453,6 +422,7 @@ cdef inline tuple regularize_matrix_cy(float[:, ::1] M):
         for t in range(M.shape[1]):
             N[i, t] = M[i, t]
 
+    t = 0
     while t < 100:
         #status = lap.spotrf(N)[1]
         status = is_semi_pos_def_chol_cy(N)
@@ -475,6 +445,7 @@ cdef inline tuple phase_linking_process_cy(float complex[:, ::1] ccg_sample, int
     cdef cnp.intp_t n1 = ccg_sample.shape[1]
     cdef float complex[::1] squeezed
     cdef float quality
+    cdef int status
 
     coh_mat = est_corr_cy(ccg_sample)
 
@@ -520,6 +491,7 @@ cdef inline tuple sequential_phase_linking_cy(float complex[:,::1] full_stack_co
                                                            dtype=np.complex64)
 
     quality = 0
+    temp_quality = 0
 
     for sstep in range(total_num_mini_stacks):
 
@@ -532,7 +504,7 @@ cdef inline tuple sequential_phase_linking_cy(float complex[:,::1] full_stack_co
 
         if sstep == 0:
 
-            mini_stack_complex_samples = np.zeros((num_lines,ns), dtype=np.complex64)
+            mini_stack_complex_samples = np.zeros((num_lines, ns), dtype=np.complex64)
 
             for i in range(ns):
                 for t in range(num_lines):
@@ -599,7 +571,8 @@ cdef inline float complex[::1] datum_connect_cy(float complex[:, ::1] squeezed_i
 cdef float searchsorted_max(cnp.ndarray[float, ndim=1] x1, cnp.ndarray[float, ndim=1] x2, cnp.ndarray[float, ndim=1] y):
     cdef int nx = x1.shape[0]
     cdef int ny = y.shape[0]
-    cdef float outtmp, out = 0
+    cdef float outtmp = 0
+    cdef float out = 0
     cdef int t1, t2, i = 0
     cdef int temp1 = 0
     cdef int temp2 = 0
@@ -647,8 +620,6 @@ cdef void sorting(cnp.ndarray[float, ndim=1] x):
 
 
 cdef float ecdf_distance(cnp.ndarray[float, ndim=1] data1, cnp.ndarray[float, ndim=1] data2):
-
-    cdef int n1 = data1.shape[0]
     cdef cnp.ndarray[float, ndim=1] data_all = concat_cy(data1, data2)
     cdef float distance
 
@@ -661,7 +632,7 @@ cdef float ecdf_distance(cnp.ndarray[float, ndim=1] data1, cnp.ndarray[float, nd
 cdef inline float ks_lut_cy(int N1, int N2, float alpha):
     cdef float N = (N1 * N2) / (N1 + N2)
     cdef float[::1] distances = np.arange(0.01, 1, 0.001, dtype=np.float32)
-    cdef float value, pvalue
+    cdef float value, pvalue, critical_distance
     cdef int i, t
     for i in range(distances.shape[0]):
         value = distances[i]*(sqrt(N) + 0.12 + 0.11/sqrt(N))
@@ -714,8 +685,8 @@ cdef inline int[:, ::1] get_shp_row_col_c((int, int) data, float complex[:, :, :
     cdef int[::1] sample_rows, sample_cols
     cdef cnp.ndarray[long, ndim=2] ks_label, distance
     cdef int[:, ::1] shps
-    cdef cnp.ndarray[float, ndim=1] ref = np.zeros((n_image), dtype=np.float32)
-    cdef cnp.ndarray[float, ndim=1] test = np.zeros((n_image), dtype=np.float32)
+    cdef cnp.ndarray[float, ndim=1] ref = np.zeros(n_image, dtype=np.float32)
+    cdef cnp.ndarray[float, ndim=1] test = np.zeros(n_image, dtype=np.float32)
 
     row_0 = data[0]
     col_0 = data[1]
@@ -735,7 +706,7 @@ cdef inline int[:, ::1] get_shp_row_col_c((int, int) data, float complex[:, :, :
     s_rows = t2 - t1
     ref_row = reference_row - t1
 
-    sample_rows = np.zeros((s_rows), dtype=np.int32)
+    sample_rows = np.zeros(s_rows, dtype=np.int32)
     for i in range(s_rows):
         sample_rows[i] = row_0 + def_sample_rows[i + t1]
 
@@ -859,7 +830,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     cdef int[:, ::1] shp
     cdef cnp.ndarray[float complex, ndim=3] patch_slc_images = slcStackObj.read(datasetName='slc', box=big_box)
     cdef float complex[:, ::1] CCG, coh_mat, squeezed_images
-    cdef float complex[::1] vec_refined, squeezed_images_0
+    cdef float complex[::1] vec_refined
     cdef float[::1] amp_refined
     cdef bint noise = False
     cdef float temp_quality

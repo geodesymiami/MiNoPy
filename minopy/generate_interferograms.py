@@ -23,21 +23,26 @@ def main(iargs=None):
 
     Parser = MinoPyParser(iargs, script='generate_interferograms')
     inps = Parser.parse()
-    resampName = run_interferogram(inps)
 
+    resampName = inps.out_dir + '/fine'
     resampInt = resampName + '.int'
-
     filtInt = os.path.dirname(resampInt) + '/filt_fine.int'
+    cor_file = os.path.dirname(resampInt) + '/filt_fine.cor'
+
+    if os.path.exists(cor_file):
+        return
+
+    run_interferogram(inps, resampName)
+
     filter_strength = inps.filter_strength
     runFilter(resampInt, filtInt, filter_strength)
 
-    cor_file = os.path.dirname(resampInt) + '/filt_fine.cor'
     estCoherence(filtInt, cor_file)
 
     return
 
 
-def run_interferogram(inps):
+def run_interferogram(inps, resampName):
     if inps.azlooks * inps.rglooks > 1:
         extention = '.ml.slc'
     else:
@@ -52,7 +57,6 @@ def run_interferogram(inps):
         length = slcs.shape[1]
         width = slcs.shape[2]
 
-        resampName = inps.out_dir + '/fine'
         resampInt = resampName + '.int'
 
         ifg = np.memmap(resampInt, dtype=np.complex64, mode='w+', shape=(length, width))
@@ -82,7 +86,6 @@ def runFilter(infile, outfile, filterStrength):
     from mroipac.filter.Filter import Filter
 
     # Initialize the flattened interferogram
-    topoflatIntFilename = infile
     intImage = isceobj.createIntImage()
     intImage.load( infile + '.xml')
     intImage.setAccessMode('read')

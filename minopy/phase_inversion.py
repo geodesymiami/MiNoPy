@@ -44,9 +44,10 @@ def main(iargs=None):
 
         box_list = []
         for box in inversionObj.box_list:
-            index = [4]
+            index = box[4]
             out_dir = inversionObj.out_dir.decode('UTF-8')
             out_folder = out_dir + '/PATCHES/PATCH_{}'.format(index)
+            os.makedirs(out_folder, exist_ok=True)
             if not os.path.exists(out_folder + '/quality.npy'):
                 box_list.append(box)
 

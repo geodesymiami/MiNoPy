@@ -342,8 +342,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if self.template['MINOPY.parallel.mpi']:
 
-            command_line = '\nmpirun -n {} python $MINOPY_HOME/minopy/phase_inversion.py {} --mpi'.format(num_workers,
-                                                                                                          scp_args)
+            command_line = '\nibrun python $MINOPY_HOME/minopy/phase_inversion.py {} --mpi'.format(num_workers,
+                                                                                                   scp_args)
         else:
             command_line = '\n$MINOPY_HOME/minopy/phase_inversion.py {}'.format(scp_args)
 
@@ -355,6 +355,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         if os.getenv('HOSTNAME') is None or os.getenv('HOSTNAME').startswith('login') or job_obj.scheduler is None:
 
             scp_args = scp_args + ' --slcStack {a}'.format(a=os.path.join(self.workDir, 'inputs/slcStack.h5'))
+            scp_args2 = scp_args2 + ' --slcStack {a}'.format(a=os.path.join(self.workDir, 'inputs/slcStack.h5'))
             print('phase_inversion.py ', scp_args)
             minopy.phase_inversion.main(scp_args.split())
             print('phase_inversion.py ', scp_args2)
