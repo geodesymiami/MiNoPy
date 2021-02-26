@@ -60,7 +60,7 @@ def main(iargs=None):
             if size > len(box_list):
                 num = 1
             else:
-                num = ceil(len(box_list) // size)
+                num = ceil(len(box_list) // size) + 1
 
             index = np.arange(0, len(box_list), num)
             index[-1] = len(box_list)
