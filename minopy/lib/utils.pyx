@@ -341,7 +341,7 @@ cdef inline float sum1d(float[::1] x):
     return out
 
 
-cdef inline tuple test_PS_cy(float complex[:, ::1] coh_mat):
+cdef tuple test_PS_cy(float complex[:, ::1] coh_mat):
     """ checks if the pixel is PS """
 
     cdef cnp.intp_t i, t, n = coh_mat.shape[0]
@@ -632,7 +632,7 @@ cdef float ecdf_distance(cnp.ndarray[float, ndim=1] data1, cnp.ndarray[float, nd
 cdef inline float ks_lut_cy(int N1, int N2, float alpha):
     cdef float N = (N1 * N2) / (N1 + N2)
     cdef float[::1] distances = np.arange(0.01, 1, 0.001, dtype=np.float32)
-    cdef float value, pvalue, critical_distance
+    cdef float value, pvalue, critical_distance = 0.1
     cdef int i, t
     for i in range(distances.shape[0]):
         value = distances[i]*(sqrt(N) + 0.12 + 0.11/sqrt(N))
@@ -674,7 +674,7 @@ cdef int count(cnp.ndarray[long, ndim=2]  x, long value):
 
 
 
-cdef inline int[:, ::1] get_shp_row_col_c((int, int) data, float complex[:, :, ::1] input_slc,
+cdef int[:, ::1] get_shp_row_col_c((int, int) data, float complex[:, :, ::1] input_slc,
                         int[::1] def_sample_rows, int[::1] def_sample_cols,
                         int azimuth_window, int range_window, int reference_row,
                         int reference_col, float distance_threshold):
