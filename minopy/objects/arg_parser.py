@@ -267,8 +267,10 @@ class MinoPyParser:
         patch.add_argument('-p', '--patchSize', type=str, dest='patch_size', default=200,
                            help='azimuth window size for shp finding')
         patch.add_argument('-s', '--slcStack', type=str, dest='slc_stack', help='SLC stack file')
-        patch.add_argument('--mpi', dest='mpi_flag', action='store_true',
-                          help='run in parallel with mpi if true')
+        patch.add_argument('-n', '--numWorker', dest='num_worker', type=str, default='1',
+                           help='Number of parallel tasks (default: 1)')
+        #patch.add_argument('--parallel', dest='parallel', action='store_true',
+        #                   help='run in parallel with mpi if true')
         patch.add_argument('--unpatch', dest='unpatch_flag', action='store_true',
                            help='Do not process because it has finished in last run, just do un-patching')
         #patch.add_argument('-b', '--bbox', type=str, dest='bbox', default=None,

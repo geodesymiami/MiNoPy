@@ -673,11 +673,10 @@ cdef int count(cnp.ndarray[long, ndim=2]  x, long value):
     return out
 
 
-
 cdef int[:, ::1] get_shp_row_col_c((int, int) data, float complex[:, :, ::1] input_slc,
-                        int[::1] def_sample_rows, int[::1] def_sample_cols,
+                        cnp.ndarray[int, ndim=1] def_sample_rows, cnp.ndarray[int, ndim=1] def_sample_cols,
                         int azimuth_window, int range_window, int reference_row,
-                        int reference_col, float distance_threshold):
+                        int reference_col, float distance_threshold, bytes shp_test):
 
     cdef int row_0, col_0, i, temp, ref_row, ref_col, t1, t2, s_rows, s_cols
     cdef long ref_label
@@ -692,7 +691,6 @@ cdef int[:, ::1] get_shp_row_col_c((int, int) data, float complex[:, :, ::1] inp
     col_0 = data[1]
     length = input_slc.shape[1]
     width = input_slc.shape[2]
-
 
     t1 = 0
     t2 = def_sample_rows.shape[0]
@@ -726,20 +724,39 @@ cdef int[:, ::1] get_shp_row_col_c((int, int) data, float complex[:, :, ::1] inp
     for i in range(s_cols):
         sample_cols[i] = col_0 + def_sample_cols[i + t1]
 
-
     for i in range(n_image):
         ref[i] = cabsf(input_slc[i, row_0, col_0])
 
     sorting(ref)
-
     distance = np.zeros((s_rows, s_cols), dtype=long)
 
-    for t1 in range(s_rows):
-        for t2 in range(s_cols):
-            for temp in range(n_image):
-                test[temp] = cabsf(input_slc[temp, sample_rows[t1], sample_cols[t2]])
-            sorting(test)
-            distance[t1, t2] = 1 * (ecdf_distance(ref, test) <= distance_threshold)
+
+    if shp_test == b'ad':
+        for t1 in range(s_rows):
+            for t2 in range(s_cols):
+                test = np.zeros(n_image, dtype=np.float32)
+                for temp in range(n_image):
+                    test[temp] = cabsf(input_slc[temp, sample_rows[t1], sample_cols[t2]])
+                sorting(test)
+                distance[t1, t2] = ADtest_cy(ref, test, distance_threshold)
+
+    elif shp_test == b'ttest':
+        for t1 in range(s_rows):
+            for t2 in range(s_cols):
+                test = np.zeros(n_image, dtype=np.float32)
+                for temp in range(n_image):
+                    test[temp] = cabsf(input_slc[temp, sample_rows[t1], sample_cols[t2]])
+                sorting(test)
+                distance[t1, t2] = ttest_indtest_cy(ref, test, distance_threshold)
+    else:
+        for t1 in range(s_rows):
+            for t2 in range(s_cols):
+                test = np.zeros(n_image, dtype=np.float32)
+                for temp in range(n_image):
+                    test[temp] = cabsf(input_slc[temp, sample_rows[t1], sample_cols[t2]])
+                sorting(test)
+                distance[t1, t2] = ks2smapletest_cy(ref, test, distance_threshold)
+
 
     ks_label = clabel(distance, connectivity=2)
     ref_label = ks_label[ref_row, ref_col]
@@ -808,9 +825,13 @@ cdef float complex[:, ::1] normalize_samples(float complex[:, ::1] X):
 
 
 def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_window, int width, int length, int n_image,
-                      object slcStackObj, float distance_threshold, int[::1] def_sample_rows,
-                      int[::1] def_sample_cols, int reference_row, int reference_col, bytes phase_linking_method,
-                      int total_num_mini_stacks, int default_mini_stack_size):
+                    object slcStackObj, float distance_threshold, cnp.ndarray[int, ndim=1] def_sample_rows,
+                    cnp.ndarray[int, ndim=1] def_sample_cols, int reference_row, int reference_col,
+                    bytes phase_linking_method, int total_num_mini_stacks, int default_mini_stack_size,
+                    bytes shp_test):
+
+    #cdef int[::1] def_sample_rows = def_sample_rows_i
+    #cdef int[::1] def_sample_cols = def_sample_cols_i
     cdef cnp.ndarray[int, ndim=1] big_box = get_big_box_cy(box, range_window, azimuth_window, width, length)
     cdef int box_width = box[2] - box[0]
     cdef int box_length = box[3] - box[1]
@@ -848,7 +869,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     for i in range(num_points):
         data = (coords[i,0], coords[i,1])
         shp = get_shp_row_col_c(data, patch_slc_images, def_sample_rows, def_sample_cols, azimuth_window,
-                                range_window, reference_row, reference_col, distance_threshold)
+                                range_window, reference_row, reference_col, distance_threshold, shp_test)
         num_shp = shp.shape[0]
 
         CCG = np.zeros((n_image, num_shp), dtype=np.complex64)
@@ -886,11 +907,6 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
 
             rslc_ref[m, data[0] - row1, data[1] - col1] = vec_refined[m]
 
-        #if noise:
-        #    quality[data[0] - row1, data[1] - col1] = 0
-        #else:
-        #    quality[data[0] - row1, data[1] - col1] = gam_pta_c(angmat2(coh_mat), vec_refined)
-
         quality[data[0] - row1, data[1] - col1] = temp_quality
 
         prog_bar.update(p + 1, every=10, suffix='{}/{} pixels'.format(p + 1, num_points))
@@ -898,8 +914,8 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
 
     return rslc_ref, quality, box
 
-cdef inline bint ks2smapletest_cy(float[::1] S1, float[::1] S2, float threshold):
-    cdef bint res
+cdef int ks2smapletest_cy(cnp.ndarray[float, ndim=1] S1, cnp.ndarray[float, ndim=1] S2, float threshold):
+    cdef int res
     cdef float distance = ecdf_distance(S1, S2)
     if distance <= threshold:
         res = 1
@@ -907,10 +923,10 @@ cdef inline bint ks2smapletest_cy(float[::1] S1, float[::1] S2, float threshold)
         res = 0
     return res
 
-cdef inline bint ttest_indtest_cy(float[::1] S1, float[::1] S2, float threshold):
+cdef int ttest_indtest_cy(cnp.ndarray[float, ndim=1] S1, cnp.ndarray[float, ndim=1] S2, float threshold):
     cdef object testobj = ttest_ind(S1, S2, equal_var=False)
     cdef float test = testobj[1]
-    cdef bint res
+    cdef int res
     if test >= threshold:
         res = 1
     else:
@@ -919,10 +935,10 @@ cdef inline bint ttest_indtest_cy(float[::1] S1, float[::1] S2, float threshold)
     return res
 
 
-cdef inline bint ADtest_cy(float[::1] S1, float[::1] S2, float threshold):
+cdef int ADtest_cy(cnp.ndarray[float, ndim=1] S1, cnp.ndarray[float, ndim=1] S2, float threshold):
     cdef object testobj = anderson_ksamp([S1, S2])
     cdef float test = testobj.significance_level
-    cdef bint res
+    cdef int res
     if test >= threshold:
         res = 1
     else:

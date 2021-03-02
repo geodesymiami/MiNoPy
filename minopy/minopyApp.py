@@ -318,16 +318,21 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         """
 
         scp_args = '--workDir {a0} --rangeWin {a1} --azimuthWin {a2} --method {a3} --test {a4} ' \
-                   '--patchSize {a5}'.format(a0=self.workDir, a1=self.template['MINOPY.inversion.range_window'],
-                                               a2=self.template['MINOPY.inversion.azimuth_window'],
-                                               a3=self.template['MINOPY.inversion.plmethod'],
-                                               a4=self.template['MINOPY.inversion.shp_test'],
-                                               a5=self.template['MINOPY.inversion.patch_size'])
+                   '--patchSize {a5} --numWorker {a6}'.format(a0=self.workDir,
+                                                              a1=self.template['MINOPY.inversion.range_window'],
+                                                              a2=self.template['MINOPY.inversion.azimuth_window'],
+                                                              a3=self.template['MINOPY.inversion.plmethod'],
+                                                              a4=self.template['MINOPY.inversion.shp_test'],
+                                                              a5=self.template['MINOPY.inversion.patch_size'],
+                                                              a6=self.template['MINOPY.parallel.num_workers'])
 
+        '''
         if not self.inps.wall_time in ['None', None]:
             scp_args += '--walltime {} '.format(self.inps.wall_time)
         if self.inps.queue:
             scp_args += '--queue {}'.format(self.inps.queue)
+        '''
+
         scp_args2 = scp_args + ' --unpatch'
 
         inps = self.inps
@@ -341,14 +346,16 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         job_name = 'run_phase_inversion'
         job_file_name = 'run_phase_inversion_0'
 
-        if self.template['MINOPY.parallel.mpi']:
+        command_line1 = '\n$MINOPY_HOME/minopy/phase_inversion.py {}'.format(scp_args)
 
-            command_line = '\nibrun python $MINOPY_HOME/minopy/phase_inversion.py {} --mpi'.format(num_workers,
-                                                                                                   scp_args)
-        else:
-            command_line = '\n$MINOPY_HOME/minopy/phase_inversion.py {}'.format(scp_args)
+        #if self.template['MINOPY.parallel.mpi']:
 
-        command_line += '\n$MINOPY_HOME/minopy/phase_inversion.py {} --unpatch'.format(scp_args)
+        #    command_line = '\nibrun python $MINOPY_HOME/minopy/phase_inversion.py {} --mpi'.format(num_workers,
+        #                                                                                           scp_args)
+        #else:
+        #    command_line = '\n$MINOPY_HOME/minopy/phase_inversion.py {}'.format(scp_args)
+
+        command_line2 += '\n$MINOPY_HOME/minopy/phase_inversion.py {} --unpatch'.format(scp_args)
 
         job_obj = JOB_SUBMIT(inps)
 
@@ -366,7 +373,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             os.makedirs(self.run_dir, exist_ok=True)
             scp_args = scp_args + ' --slcStack {a}'.format(a='/tmp/slcStack.h5')
             print('phase_inversion.py ', scp_args)
-            command_line = command_line + ' --slcStack {a}'.format(a='/tmp/slcStack.h5')
+            command_line1 = command_line1 + ' --slcStack {a}'.format(a='/tmp/slcStack.h5')
+            command_line2 = command_line2 + ' --slcStack {a}'.format(a='/tmp/slcStack.h5')
+            command_line = command_line1 + command_line2
             job_obj.write_single_job_file(job_name, job_file_name, command_line,
                                   work_dir=self.run_dir, number_of_nodes=num_nodes,
                                   distribute=os.path.join(self.workDir, 'inputs/slcStack.h5'))
@@ -498,6 +507,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 cmd = cmd + '\n'
                 run_commands.append(cmd)
 
+        run_commands.append('wait\n\n')
 
         with open(run_ifgs, 'w+') as frun:
             frun.writelines(run_commands)
@@ -612,6 +622,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
             # print(cmd)
             run_commands.append(cmd)
+
+        run_commands.append('wait\n\n')
 
         with open(run_file_unwrap, 'w+') as frun:
             frun.writelines(run_commands)

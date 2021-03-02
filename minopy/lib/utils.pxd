@@ -1,10 +1,7 @@
 cimport numpy as cnp
 cimport cython
-#from libcpp.string cimport string
 
 ctypedef float float
-
-#ctypedef string STR
 
 cdef bint isnanc(float complex)
 cdef cnp.ndarray[int, ndim=1] get_big_box_cy(cnp.ndarray[int, ndim=1], int, int, int, int)
@@ -43,12 +40,13 @@ cdef float ecdf_distance(cnp.ndarray[float, ndim=1], cnp.ndarray[float, ndim=1])
 cdef float ks_lut_cy(int, int, float)
 cdef cnp.ndarray[float, ndim=1] concat_cy(cnp.ndarray[float, ndim=1], cnp.ndarray[float, ndim=1])
 cdef int count(cnp.ndarray[long, ndim=2], long)
-cdef int[:, ::1] get_shp_row_col_c((int, int), float complex[:, :, ::1], int[::1], int[::1], int, int, int, int, float)
+cdef int[:, ::1] get_shp_row_col_c((int, int), float complex[:, :, ::1], cnp.ndarray[int, ndim=1], cnp.ndarray[int, ndim=1],
+                                   int, int, int, int, float, bytes)
 cdef float[::1] mean_along_axis_x(float[:, ::1])
 cdef float gam_pta_c(float[:, ::1], float complex[::1])
-cdef bint ks2smapletest_cy(float[::1], float[::1], float)
-cdef bint ttest_indtest_cy(float[::1], float[::1], float)
-cdef bint ADtest_cy(float[::1], float[::1], float)
+cdef int ks2smapletest_cy(cnp.ndarray[float, ndim=1], cnp.ndarray[float, ndim=1], float)
+cdef int ttest_indtest_cy(cnp.ndarray[float, ndim=1], cnp.ndarray[float, ndim=1], float)
+cdef int ADtest_cy(cnp.ndarray[float, ndim=1], cnp.ndarray[float, ndim=1], float)
 cpdef int check_invert(float[:, ::1])
 cpdef float[:, :] inverse_float_matrix(float[:, ::1])
 cdef float complex[:, ::1] normalize_samples(float complex[:, ::1])

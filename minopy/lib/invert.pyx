@@ -12,6 +12,8 @@ import h5py
 import time
 from mintpy.objects import cluster
 from isceobj.Util.ImageUtil import ImageLib as IML
+import multiprocessing as mp
+from functools import partial
 
 
 cdef void write_wrapped(list date_list, bytes out_dir, int width, int length, bytes RSLCfile, bytes date):
@@ -63,15 +65,9 @@ cdef class CPhaseLink:
         self.azimuth_window = np.int32(inps.azimuth_window)
         self.patch_size = np.int32(inps.patch_size)
 
-        if inps.mpi_flag:
-            self.mpi_flag = True
-        else:
-            self.mpi_flag = False
-
         self.out_dir = self.work_dir + b'/inverted'
         os.makedirs(self.out_dir.decode('UTF-8'), exist_ok='True')
 
-        self.get_shp_function()
         self.slcStackObj = slcStack(inps.slc_stack)
         self.metadata = self.slcStackObj.get_metadata()
         self.all_date_list = self.slcStackObj.get_date_list()
@@ -83,7 +79,10 @@ cdef class CPhaseLink:
 
         # threshold for shp test based on number of images to test
         alpha = 0.01
-        self.distance_thresh = iut.ks_lut_cy(self.n_image, self.n_image, alpha)
+        if self.shp_test == b'ks':
+            self.distance_thresh = iut.ks_lut_cy(self.n_image, self.n_image, alpha)
+        else:
+            self.distance_thresh = alpha
 
         # split the area in to patches of size 'self.patch_size'
         self.box_list, self.num_box = self.patch_slice()
@@ -105,24 +104,6 @@ cdef class CPhaseLink:
             self.sequential = True
         else:
             self.sequential = False
-        return
-
-    def get_shp_function(self):
-        """
-        Reads the shp testing function based on template file
-        Returns: shp_function
-        -------
-
-        """
-
-        if self.shp_test == b'ks':
-            self.shp_function = iut.ks2smapletest_cy
-        elif self.shp_test == b'ad':
-            self.shp_function = iut.ADtest_cy
-        elif self.shp_test == b'ttest':
-            self.shp_function = iut.ttest_indtest_cy
-        else:
-            self.shp_function = iut.ks2smapletest_cy
         return
 
     def patch_slice(self):
@@ -208,15 +189,7 @@ cdef class CPhaseLink:
 
         return
 
-    def loop_patches(self, list box_list):
-
-        cdef float m, s, start_time = time.time()
-        cdef int index, box_width, box_length
-        cdef cnp.ndarray[int, ndim=1] box, tbox
-        cdef bytes out_folder
-        cdef cnp.ndarray[float complex, ndim=3] rslc_ref
-        cdef cnp.ndarray[float, ndim=2] quality
-        cdef object cluster_obj
+    def get_datakwargs(self):
 
         cdef dict data_kwargs = {
             "range_window" : self.range_window,
@@ -226,21 +199,33 @@ cdef class CPhaseLink:
             "n_image" : self.n_image,
             "slcStackObj" : self.slcStackObj,
             "distance_threshold" : self.distance_thresh,
-            "def_sample_rows" : self.sample_rows,
-            "def_sample_cols" : self.sample_cols,
+            "def_sample_rows" : np.array(self.sample_rows),
+            "def_sample_cols" : np.array(self.sample_cols),
             "reference_row" : self.reference_row,
             "reference_col" : self.reference_col,
             "phase_linking_method" : self.phase_linking_method,
             "total_num_mini_stacks" : self.total_num_mini_stacks,
-            "default_mini_stack_size" : self.mini_stack_default_size
+            "default_mini_stack_size" : self.mini_stack_default_size,
+            "shp_test": self.shp_test
         }
+        return data_kwargs
 
-        self.mpi_flag = True      # Should fix dask/cluster to be compatible with cython
+
+    def loop_patches(self, list box_list):
+
+        cdef float m, s, start_time = time.time()
+        cdef int index, box_width, box_length
+        cdef cnp.ndarray[int, ndim=1] box, tbox
+        cdef bytes out_folder
+        cdef cnp.ndarray[float complex, ndim=3] rslc_ref
+        cdef cnp.ndarray[float, ndim=2] quality
+        cdef object cluster_obj
+        cdef dict data_kwargs = self.get_datakwargs()
+
         for box in box_list:
 
             data_kwargs['box'] = box[0:4]
             index = box[4]
-
             out_folder = self.out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
 
             os.makedirs(self.out_dir.decode('UTF-8') + '/PATCHES', exist_ok=True)
@@ -248,6 +233,9 @@ cdef class CPhaseLink:
             if os.path.exists(out_folder.decode('UTF-8') + '/quality.npy'):
                 continue
 
+            rslc_ref, quality, tbox = iut.process_patch_c(**data_kwargs)
+
+            '''
             if self.mpi_flag:
                 rslc_ref, quality, tbox = iut.process_patch_c(**data_kwargs)
 
@@ -267,7 +255,7 @@ cdef class CPhaseLink:
 
                 # close dask cluster and client
                 cluster_obj.close()
-
+            '''
             np.save(out_folder.decode('UTF-8') + '/rslc_ref.npy', rslc_ref)
             np.save(out_folder.decode('UTF-8') + '/quality.npy', quality)
 
