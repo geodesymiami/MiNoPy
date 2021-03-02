@@ -355,7 +355,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         #else:
         #    command_line = '\n$MINOPY_HOME/minopy/phase_inversion.py {}'.format(scp_args)
 
-        command_line2 += '\n$MINOPY_HOME/minopy/phase_inversion.py {} --unpatch'.format(scp_args)
+        command_line2 = '\n$MINOPY_HOME/minopy/phase_inversion.py {} --unpatch'.format(scp_args)
 
         job_obj = JOB_SUBMIT(inps)
 
