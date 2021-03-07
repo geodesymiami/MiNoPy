@@ -1,107 +1,48 @@
 ##! /bin/bash
-#set -x
-#trap read debug
 
-function compute_tasks_for_step {
-    file=$1
-    stepname=$2
-
-    IFS=$'\n'
-    running_tasks=($(squeue -u $USER --format=%j -rh))
-    unset IFS
-
-    run_files_dir=$(dirname "${file}")
-
-    tasks=0
-    for t in "${running_tasks[@]}"; do
-	if [[ "$t" == *"$stepname"* ]]; then
-	    f="${run_files_dir}/${t}"
-	    numtasks=$(cat $f | wc -l)
-            ((tasks=tasks+$numtasks))
-	fi
-    done
-
-    echo $tasks
-    return 0
+function abbreviate {
+    abb=$1
+    if [[ "${#abb}" -gt $2 ]]; then
+        abb=$(echo "$(echo $(basename $abb) | cut -c -$3)...$(echo $(basename $abb) | rev | cut -c -$4 | rev)")
+    fi
+    echo $abb
 }
 
-function submit_job_conditional {
+function remove_from_list {
+    var=$1
+    shift
+    list=("$@")
+    new_list=() # Not strictly necessary, but added for clarity
 
-    declare -A step_max_task_list
-    step_max_task_list=(
-	[minopy_crop]=500
-	[phase_inversion]=500
-	[minopy_ifgrams]=500
-	[minopy_unwrap]=500
-	[mintpy_corrections]=10
-    )
-
-    file=$1
-
-    step_name=$(echo $file | grep -oP "(?<=run_)(.*)(?=_\d{1}.job)")
-    step_max_tasks="${step_max_task_list[$step_name]}"
-
-    num_active_tasks=$(compute_tasks_for_step $file $step_name)
-    num_tasks_job=$(cat ${file%.*} | wc -l)
-    total_tasks=$(($num_active_tasks+$num_tasks_job))
-
-    echo "$step_name: number of running/pending tasks is $num_active_tasks (maximum $step_max_tasks)" >&2
-    echo "$file: $num_tasks_job additional tasks" >&2
-    echo "$step_name: $total_tasks total tasks (maximum $step_max_tasks)" >&2
-
-    num_active_jobs=$(squeue -u $USER -h -t running,pending -r | wc -l )
-    echo "Number of running/pending jobs: $num_active_jobs" >&2
-
-    if [[ $num_active_jobs -lt $MAX_JOBS_PER_QUEUE ]] && [[ $total_tasks -lt $step_max_tasks ]]; then
-        job_submit_message=$(sbatch $file)
-        exit_status="$?"
-        if [[ $exit_status -ne 0 ]]; then
-            echo "sbatch message: $job_submit_message" >&2
-            echo "sbatch submit error: exit code $exit_status. Sleep 30 seconds and try again" >&2
-            sleep 30
-            job_submit_message=$(sbatch $file | grep "Submitted batch job")
-            exit_status="$?"
-            if [[ $exit_status -ne 0 ]]; then
-                echo "sbatch error message: $job_submit_message" >&2
-                echo "sbatch submit error: exit code $exit_status. Sleep 60 seconds and try again" >&2
-                sleep 60
-                job_submit_message=$(sbatch $file | grep "Submitted batch job")
-                exit_status="$?"
-                if [[ $exit_status -ne 0 ]]; then
-                    echo "sbatch error message: $job_submit_message" >&2
-                    echo "sbatch submit error again: exit code $exit_status. Exiting." >&2
-                    exit 1
-                fi
-            fi
+    #echo "VAR: $var"
+    for item in ${list[@]}
+    do
+        #echo "$item"
+        if [ "$item" != "$var" ]
+        then
+            new_list+=("$item")
         fi
-
-        jobnumber=$(grep -oE "[0-9]{7}" <<< $job_submit_message)
-
-        echo $jobnumber
-        return 0
-
-    fi
-
-    return 1
-
+    done
+    list=("${new_list[@]}")
+    unset new_list
+    echo "${list[@]}"
 }
 
 if [[ "$1" == "--help" || "$1" == "-h" ]]; then
-helptext="                                                                         \n\
-Job submission script
-usage: submit_jobs.bash custom_template_file [--start] [--stop] [--dostep] [--help]\n\
-                                                                                   \n\
-  Examples:                                                                        \n\
-      submit_jobs.bash \$SAMPLESDIR/unittestGalapagosSenDT128.template              \n\
-      submit_jobs.bash \$SAMPLESDIR/unittestGalapagosSenDT128.template --start 2    \n\
-      submit_jobs.bash \$SAMPLESDIR/unittestGalapagosSenDT128.template --dostep 4   \n\
-      submit_jobs.bash \$SAMPLESDIR/unittestGalapagosSenDT128.template --stop 8     \n\
-      submit_jobs.bash \$SAMPLESDIR/unittestGalapagosSenDT128.template --start timeseries \n\
-      submit_jobs.bash \$SAMPLESDIR/unittestGalapagosSenDT128.template --dostep insarmaps \n\
-                                                                                   \n\
- Processing steps (start/end/dostep): \n\
+helptext="                                                                                       \n\
+Job submission script                                                                            \n\
+usage: submit_minopy_jobs.bash custom_template_file [--start] [--stop] [--dostep] [--help]       \n\
+                                                                                                 \n\
+  Examples:                                                                                      \n\
+      submit_minopy_jobs.bash \$SAMPLESDIR/unittestGalapagosSenDT128.template                    \n\
+      submit_minopy_jobs.bash \$SAMPLESDIR/unittestGalapagosSenDT128.template --start ifgrams    \n\
+      submit_minopy_jobs.bash \$SAMPLESDIR/unittestGalapagosSenDT128.template --dostep crop      \n\
+      submit_minopy_jobs.bash \$SAMPLESDIR/unittestGalapagosSenDT128.template --stop unwrap      \n\
+
                                                                                  \n\
-   ['1-16', 'timeseries', 'insarmaps' ]                                          \n\
+ Processing steps (start/end/dostep):                                            \n\
+                                                                                 \n\
+   ['crop', 'inversion', 'ifgrams', 'unwrap', 'mintpy_corrections' ]             \n\
                                                                                  \n\
    In order to use either --start or --dostep, it is necessary that a            \n\
    previous run was done using one of the steps options to process at least      \n\

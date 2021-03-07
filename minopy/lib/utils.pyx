@@ -1,6 +1,7 @@
 #cython: wraparound=False, nonecheck=False, boundscheck=False, cdivision=True, language_level=3
 
 cimport cython
+import os
 import numpy as np
 cimport numpy as cnp
 from libc.stdio cimport printf
@@ -828,7 +829,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
                     object slcStackObj, float distance_threshold, cnp.ndarray[int, ndim=1] def_sample_rows,
                     cnp.ndarray[int, ndim=1] def_sample_cols, int reference_row, int reference_col,
                     bytes phase_linking_method, int total_num_mini_stacks, int default_mini_stack_size,
-                    bytes shp_test):
+                    bytes shp_test, bytes out_dir):
 
     #cdef int[::1] def_sample_rows = def_sample_rows_i
     #cdef int[::1] def_sample_cols = def_sample_cols_i
@@ -837,6 +838,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     cdef int box_length = box[3] - box[1]
     cdef cnp.ndarray[float complex, ndim=3] rslc_ref = np.zeros((n_image, box_length, box_width), dtype=np.complex64)
     cdef cnp.ndarray[float, ndim=2] quality = np.zeros((box_length, box_width), dtype=np.float32)
+    cdef cnp.ndarray[int, ndim=2] SHP = np.zeros((box_length, box_width), dtype=np.int32)
     cdef int row1 = box[1] - big_box[1]
     cdef int row2 = box[3] - big_box[1]
     cdef int col1 = box[0] - big_box[0]
@@ -856,6 +858,13 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     cdef bint noise = False
     cdef float temp_quality
     cdef object prog_bar
+    cdef bytes out_folder
+    cdef int index = box[4]
+
+    out_folder = out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
+    os.makedirs(out_folder.decode('UTF-8'), exist_ok=True)
+    if os.path.exists(out_folder.decode('UTF-8') + '/quality.npy'):
+        return
 
     for i in range(overlap_length):
         for t in range(overlap_width):
@@ -871,6 +880,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
         shp = get_shp_row_col_c(data, patch_slc_images, def_sample_rows, def_sample_cols, azimuth_window,
                                 range_window, reference_row, reference_col, distance_threshold, shp_test)
         num_shp = shp.shape[0]
+        SHP[data[0] - row1, data[1] - col1] = num_shp
 
         CCG = np.zeros((n_image, num_shp), dtype=np.complex64)
         for t in range(num_shp):
@@ -912,7 +922,11 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
         prog_bar.update(p + 1, every=10, suffix='{}/{} pixels'.format(p + 1, num_points))
         p += 1
 
-    return rslc_ref, quality, box
+    np.save(out_folder.decode('UTF-8') + '/rslc_ref.npy', rslc_ref)
+    np.save(out_folder.decode('UTF-8') + '/shp.npy', SHP)
+    np.save(out_folder.decode('UTF-8') + '/quality.npy', quality)
+
+    return
 
 cdef int ks2smapletest_cy(cnp.ndarray[float, ndim=1] S1, cnp.ndarray[float, ndim=1] S2, float threshold):
     cdef int res

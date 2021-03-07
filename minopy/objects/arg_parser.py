@@ -312,12 +312,22 @@ class MinoPyParser:
                             help='input correlation file')
         parser.add_argument('-u', '--unw', dest='unwrapped_ifg', type=str, required=True,
                             help='output unwrapped interferogram')
-        parser.add_argument('-s', '--reference', dest='reference', type=str, default='reference',
-                            help='Reference .h5 file to get metadata')
+        parser.add_argument('-sw', '--ref_width', dest='ref_width', type=int, default=None,
+                            help='Width of Reference .h5 file')
+        parser.add_argument('-sl', '--ref_length', dest='ref_length', type=int, default=None,
+                            help='Length of .h5 file')
+        parser.add_argument('-w', '--wavelength', dest='wavelength', type=str, default=None,
+                            help='wavelength')
+        parser.add_argument('-ht', '--height', dest='height', type=str, default=None,
+                            help='Altitude of satellite')
+        parser.add_argument('-er', '--earth_radius', dest='earth_radius', type=str, default=None,
+                            help='Earth Radius')
         parser.add_argument('-i', '--initMethod', dest='init_method', type=str, default='MST',
                             help='unwrap initialization algorithm (MST, MCF)')
         parser.add_argument('-d', '--defoMax', dest='defo_max', type=float, default=1.2,
                             help='Maximum abrupt phase discontinuity (cycles)')
+        parser.add_argument('-nt', '--num_tiles', dest='num_tiles', type=int, default=1,
+                            help='Number of tiles for Unwrapping in parallel')
 
         return parser
 

@@ -25,8 +25,12 @@ from minopy.lib import invert as iv
 from math import ceil
 import multiprocessing as mp
 from functools import partial
+import signal
+
 #################################
 
+def init_worker():
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 def main(iargs=None):
     '''
@@ -53,9 +57,18 @@ def main(iargs=None):
             if not os.path.exists(out_folder + '/quality.npy'):
                 box_list.append(box)
 
-        num_cores = np.min([mp.cpu_count(), int(inps.num_worker)])
-        pool = mp.Pool(processes=num_cores)
+        num_workers = int(inps.num_worker)
+        cpu_count = mp.cpu_count()
+        if num_workers > cpu_count:
+            print('Maximum number of Workers is {}\n'.format(cpu_count))
+            num_cores = cpu_count
+        else:
+            num_cores = num_workers
+
+        pool = mp.Pool(num_cores, init_worker)
         data_kwargs = inversionObj.get_datakwargs()
+        os.makedirs(data_kwargs['out_dir'].decode('UTF-8') + '/PATCHES', exist_ok=True)
+
         func = partial(iut.process_patch_c, range_window=data_kwargs['range_window'],
                        azimuth_window=data_kwargs['azimuth_window'], width=data_kwargs['width'],
                        length=data_kwargs['length'], n_image=data_kwargs['n_image'],
@@ -66,31 +79,17 @@ def main(iargs=None):
                        default_mini_stack_size=data_kwargs['default_mini_stack_size'],
                        shp_test=data_kwargs['shp_test'],
                        def_sample_rows=data_kwargs['def_sample_rows'],
-                       def_sample_cols=data_kwargs['def_sample_cols'])
-        pool.map(func, box_list)
-        pool.close()
-        pool.join()
+                       def_sample_cols=data_kwargs['def_sample_cols'],
+                       out_dir=data_kwargs['out_dir'])
 
-        '''
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        size = comm.Get_size()
-        np.random.seed(seed=rank)
-
-        if size > len(box_list):
-            num = 1
-        else:
-            num = ceil(len(box_list) // size) + 1
-
-        index = np.arange(0, len(box_list), num)
-        index[-1] = len(box_list)
-
-        if rank < len(index) - 1:
-            time_passed = inversionObj.loop_patches(box_list[index[rank]:index[rank+1]])
-            comm.gather(time_passed, root=0)
-
-        MPI.Finalize()
-        '''
+        try:
+            pool.map(func, box_list)
+            pool.close()
+            pool.join()
+        except KeyboardInterrupt:
+            print("\nCaught KeyboardInterrupt, terminating workers")
+            pool.terminate()
+            pool.join()
 
     return None
 

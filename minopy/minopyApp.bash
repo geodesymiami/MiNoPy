@@ -35,7 +35,12 @@ else
     fi
 fi
 template_file=$1
-WORK_DIR=$SCRATCHDIR/$PROJECT_NAME/minopy
+if [[ $PROJECT_NAME == "minopy_template.cfg"]]; then
+  template_real_path = $(realpath "$1")
+  WORK_DIR=$( dirname "$template_real_path")
+else;
+  WORK_DIR=$SCRATCHDIR/$PROJECT_NAME/minopy
+fi
 
 mkdir -p $WORK_DIR
 cd $WORK_DIR

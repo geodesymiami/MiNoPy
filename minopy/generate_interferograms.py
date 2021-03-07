@@ -24,12 +24,14 @@ def main(iargs=None):
     Parser = MinoPyParser(iargs, script='generate_interferograms')
     inps = Parser.parse()
 
+    os.makedirs(inps.out_dir, exist_ok=True)
+
     resampName = inps.out_dir + '/fine'
     resampInt = resampName + '.int'
     filtInt = os.path.dirname(resampInt) + '/filt_fine.int'
     cor_file = os.path.dirname(resampInt) + '/filt_fine.cor'
 
-    if os.path.exists(cor_file):
+    if os.path.exists(cor_file + '.xml'):
         return
 
     run_interferogram(inps, resampName)
@@ -59,11 +61,20 @@ def run_interferogram(inps, resampName):
 
         resampInt = resampName + '.int'
 
-        ifg = np.memmap(resampInt, dtype=np.complex64, mode='w+', shape=(length, width))
+        #ifg_mem = np.zeros([length, width], dtype=np.complex64)
 
-        for kk in range(length):
-            ifg[kk, :] = (slcs[ref_ind, kk, :] * np.conj(slcs[sec_ind, kk, :])).reshape(1, -1)
 
+        ref_image = slcs[ref_ind, :, :].reshape(length, width)
+        sec_image = np.conj(slcs[sec_ind, :, :]).reshape(length, width)
+
+        ifg = np.memmap(resampInt, dtype=np.complex64, mode='write', shape=(length, width))
+        ifg[:, :] = ref_image * sec_image
+
+        #for kk in range(length):
+        #    ifg[kk, :] = (slcs[ref_ind, kk, :] * np.conj(slcs[sec_ind, kk, :])).reshape(1, -1)
+
+
+        #ifg[:, :] = ifg_mem[:, :]
 
         obj_int = IntImage()
         obj_int.setFilename(resampInt)

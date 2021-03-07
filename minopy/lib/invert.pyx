@@ -174,6 +174,14 @@ cdef class CPhaseLink:
                                     chunks=True,
                                     dtype=np.complex64)
 
+                RSLC.create_dataset('shp',
+                                    shape=(self.length, self.width),
+                                    maxshape=(self.length, self.width),
+                                    chunks=True,
+                                    dtype=np.int32)
+
+                RSLC['shp'][:, :] = 1
+
                 RSLC.create_dataset('quality',
                                     shape=(self.length, self.width),
                                     maxshape=(self.length, self.width),
@@ -181,6 +189,7 @@ cdef class CPhaseLink:
                                     dtype=np.float32)
 
                 RSLC['quality'][:, :] = -1
+
 
                 # 1D dataset containing dates of all images
                 data = np.array(self.all_date_list, dtype=np.string_)
@@ -206,7 +215,8 @@ cdef class CPhaseLink:
             "phase_linking_method" : self.phase_linking_method,
             "total_num_mini_stacks" : self.total_num_mini_stacks,
             "default_mini_stack_size" : self.mini_stack_default_size,
-            "shp_test": self.shp_test
+            "shp_test": self.shp_test,
+            "out_dir": self.out_dir,
         }
         return data_kwargs
 
@@ -214,50 +224,14 @@ cdef class CPhaseLink:
     def loop_patches(self, list box_list):
 
         cdef float m, s, start_time = time.time()
-        cdef int index, box_width, box_length
-        cdef cnp.ndarray[int, ndim=1] box, tbox
-        cdef bytes out_folder
-        cdef cnp.ndarray[float complex, ndim=3] rslc_ref
-        cdef cnp.ndarray[float, ndim=2] quality
-        cdef object cluster_obj
+        cdef cnp.ndarray[int, ndim=1] box
         cdef dict data_kwargs = self.get_datakwargs()
 
         for box in box_list:
 
-            data_kwargs['box'] = box[0:4]
-            index = box[4]
-            out_folder = self.out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
-
+            data_kwargs['box'] = box
             os.makedirs(self.out_dir.decode('UTF-8') + '/PATCHES', exist_ok=True)
-            os.makedirs(out_folder.decode('UTF-8'), exist_ok=True)
-            if os.path.exists(out_folder.decode('UTF-8') + '/quality.npy'):
-                continue
-
-            rslc_ref, quality, tbox = iut.process_patch_c(**data_kwargs)
-
-            '''
-            if self.mpi_flag:
-                rslc_ref, quality, tbox = iut.process_patch_c(**data_kwargs)
-
-            else:
-                box_width = box[2] - box[0]
-                box_length = box[3] - box[1]
-                rslc_ref = np.empty([self.n_image, box_length, box_width], dtype=np.complex64)
-                quality = np.empty([box_length, box_width], dtype=np.float32)
-
-                cluster_obj = cluster.DaskCluster('local', 4)
-                cluster_obj.open()
-
-                # run dask
-                rslc_ref, quality = cluster_obj.run(func=iut.process_patch_c,
-                                                    func_data=data_kwargs,
-                                                    results=[rslc_ref, quality])
-
-                # close dask cluster and client
-                cluster_obj.close()
-            '''
-            np.save(out_folder.decode('UTF-8') + '/rslc_ref.npy', rslc_ref)
-            np.save(out_folder.decode('UTF-8') + '/quality.npy', quality)
+            iut.process_patch_c(**data_kwargs)
 
         m, s = divmod(time.time() - start_time, 60)
         print('time used: {:02.0f} mins {:02.1f} secs.\n'.format(m, s))
@@ -284,6 +258,7 @@ cdef class CPhaseLink:
                     patch_dir = self.out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
                     rslc_ref = np.load(patch_dir.decode('UTF-8') + '/rslc_ref.npy')
                     quality = np.load(patch_dir.decode('UTF-8') + '/quality.npy')
+                    shp = np.load(patch_dir.decode('UTF-8') + '/shp.npy')
 
                     print('-' * 50)
                     print("unpatch block {}/{} : {}".format(index, self.num_box, box[0:4]))
@@ -292,9 +267,31 @@ cdef class CPhaseLink:
                     block = [0, self.n_image, box[1], box[3], box[0], box[2]]
                     write_hdf5_block_3D(fhandle, rslc_ref, b'slc', block)
 
+                    # SHP - 2D
+                    block = [box[1], box[3], box[0], box[2]]
+                    write_hdf5_block_2D(fhandle, shp, b'shp', block)
+
                     # temporal coherence - 2D
                     block = [box[1], box[3], box[0], box[2]]
                     write_hdf5_block_2D(fhandle, quality, b'quality', block)
+
+
+                print('write shp file')
+                shp_file = self.work_dir + b'/shp'
+
+                if not os.path.exists(shp_file.decode('UTF-8')):
+                    shp_memmap = np.memmap(shp_file.decode('UTF-8'), mode='write', dtype='int32',
+                                               shape=(self.length, self.width))
+                    IML.renderISCEXML(shp_file.decode('UTF-8'), bands=1, nyy=self.length, nxx=self.width,
+                                      datatype='int32', scheme='BIL')
+                else:
+                    shp_memmap = np.memmap(shp_file.decode('UTF-8'), mode='r+', dtype='int32',
+                                               shape=(self.length, self.width))
+
+                shp_memmap[:, :] = fhandle['shp']
+                shp_memmap = None
+
+
                 print('write quality file')
                 quality_file = self.out_dir + b'/quality'
 
@@ -309,10 +306,8 @@ cdef class CPhaseLink:
 
                 quality_memmap[:, :] = fhandle['quality']
                 quality_memmap = None
+
                 print('close HDF5 file rslc_ref.h5.')
-
-            print('close HDF5 file rslc_ref.h5.')
-
         return
 
 
