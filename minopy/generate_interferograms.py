@@ -31,8 +31,8 @@ def main(iargs=None):
     filtInt = os.path.dirname(resampInt) + '/filt_fine.int'
     cor_file = os.path.dirname(resampInt) + '/filt_fine.cor'
 
-    if os.path.exists(cor_file + '.xml'):
-        return
+    #if os.path.exists(cor_file + '.xml'):
+    #    return
 
     run_interferogram(inps, resampName)
 
@@ -52,8 +52,8 @@ def run_interferogram(inps, resampName):
 
     with h5py.File(inps.stack_file, 'r') as ds:
         date_list = np.array([x.decode('UTF-8') for x in ds['dates'][:]])
-        ref_ind = np.where(date_list==inps.reference)
-        sec_ind = np.where(date_list==inps.secondary)
+        ref_ind = np.where(date_list==inps.reference)[0]
+        sec_ind = np.where(date_list==inps.secondary)[0]
 
         slcs =  ds['slc']
         length = slcs.shape[1]
@@ -62,8 +62,7 @@ def run_interferogram(inps, resampName):
         resampInt = resampName + '.int'
 
         #ifg_mem = np.zeros([length, width], dtype=np.complex64)
-
-
+ 
         ref_image = slcs[ref_ind, :, :].reshape(length, width)
         sec_image = np.conj(slcs[sec_ind, :, :]).reshape(length, width)
 

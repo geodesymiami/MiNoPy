@@ -434,12 +434,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         inps.custom_template_file = self.customTemplateFile
         job_obj = JOB_SUBMIT(inps)
 
+        rslc_ref = os.path.join(self.workDir, 'inverted/rslc_ref.h5')
+
         if os.getenv('HOSTNAME') is None or job_obj.scheduler is None:
-            rslc_ref = os.path.join(self.workDir, 'inverted/rslc_ref.h5')
             write_job = False
             del job_obj
         else:
-            rslc_ref = '/tmp/rslc_ref.h5'
             write_job = True
 
         num_cpu = os.cpu_count()
@@ -449,7 +449,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             os.makedirs(out_dir, exist_ok='True')
 
             scp_args = '--reference {a1} --secondary {a2} --outdir {a3} --alks {a4} ' \
-                       '--rlks {a5} --filterStrength {a6}' \
+                       '--rlks {a5} --filterStrength {a6} ' \
                        '--prefix {a7} --stack {a8}'.format(a1=pair[0],
                                                            a2=pair[1],
                                                            a3=out_dir, a4=self.azimuth_look,
@@ -476,7 +476,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             frun.writelines(run_commands)
 
         if write_job:
-            job_obj.write_batch_jobs(batch_file=run_ifgs, distribute=os.path.join(self.workDir, 'inverted/rslc_ref.h5'))
+            job_obj.write_batch_jobs(batch_file=run_ifgs)
             del job_obj
         else:
             status = subprocess.Popen(run_commands, stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
@@ -706,6 +706,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             frun.writelines(run_commands)
 
         inps = self.inps
+        inps.custom_template_file = self.customTemplateFile
         inps.work_dir = self.run_dir
         inps.out_dir = self.run_dir
         job_obj = JOB_SUBMIT(inps)
