@@ -56,15 +56,21 @@ usage: submit_minopy_jobs.bash custom_template_file [--start] [--stop] [--dostep
     printf "$helptext"
     exit 0;
 else
-    PROJECT_NAME=$(basename "$1" | cut -d. -f1)
+    BASE_NAME=$(basename "$1" | cut -d. -f1)
+    exit_status="$?"
+    if [[ $BASE_NAME == "minopy_template" ]]; then
+       echo "Could not find template file. Exiting. Make sure you have specified minopy_template.cfg as the first argument."
+       exit 1;
+    fi
 fi
-WORKDIR=$SCRATCHDIR/$PROJECT_NAME
+template_real_path = $(realpath "$1")
+WORK_DIR=$( dirname "$template_real_path")
 RUNFILES_DIR=$WORKDIR"/run_files"
 
 cd $WORKDIR
 
 startstep=1
-stopstep="insarmaps"
+stopstep=5
 
 start_datetime=$(date +"%Y%m%d:%H-%m")
 echo "${start_datetime} * submit_jobs.bash ${WORKDIR} ${@:2}" >> "${WORKDIR}"/log
@@ -103,15 +109,19 @@ job_file_arr=(run_files/run_*_0.job)
 last_job_file=${job_file_arr[-1]}
 last_job_file_number=${last_job_file:14:2}
 
-if [[ $startstep == "ifgrams" ]]; then
+if [[ $startstep == "crop" ]]; then
     startstep=1
-elif [[ $startstep == "timeseries" ]]; then
-    startstep=$((last_job_file_number+1))
-elif [[ $startstep == "insarmaps" ]]; then
-    startstep=$((last_job_file_number+2))
+elif [[ $startstep == "inversion" ]]; then
+    startstep=2
+elif [[ $startstep == "ifgrams" ]]; then
+    startstep=3
+elif [[ $startstep == "unwrap" ]]; then
+    startstep=4
+elif [[ $startstep == "mintpy_corrections" ]]; then
+    startstep=5
 fi
 
-if [[ $stopstep == "ifgrams" ]]; then
+if [[ $stopstep == "crop" ]]; then
     stopstep=$last_job_file_number
 elif [[ $stopstep == "timeseries" ]]; then
     stopstep=$((last_job_file_number+1))

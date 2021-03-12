@@ -4,7 +4,7 @@ cimport cython
 import os
 import numpy as np
 cimport numpy as cnp
-from libc.stdio cimport printf
+#from libc.stdio cimport printf
 from scipy import linalg as LA
 from scipy.linalg import lapack as lap
 from libc.math cimport sqrt, log, exp, isnan
@@ -26,6 +26,7 @@ cdef extern from "complex.h":
     float complex csqrtf(float complex z)
     float cargf(float complex z)
     float fmaxf(float x, float y)
+    float fminf(float x, float y)
 
 cdef inline bint isnanc(float complex x):
     cdef bint res = isnan(crealf(x)) or isnan(cimagf(x))
@@ -491,8 +492,8 @@ cdef inline tuple sequential_phase_linking_cy(float complex[:,::1] full_stack_co
                                                            full_stack_complex_samples.shape[1]),
                                                            dtype=np.complex64)
 
-    quality = 0
-    temp_quality = 0
+    quality = 1
+    temp_quality = 1
 
     for sstep in range(total_num_mini_stacks):
 
@@ -524,7 +525,7 @@ cdef inline tuple sequential_phase_linking_cy(float complex[:,::1] full_stack_co
 
             res, squeezed_images_0, temp_quality = phase_linking_process_cy(mini_stack_complex_samples, sstep, method, True)
 
-        quality = fmaxf(temp_quality, quality)
+        quality = fminf(temp_quality, quality)
 
         for i in range(num_lines):
             vec_refined[first_line + i] = res[sstep + i]
@@ -623,7 +624,6 @@ cdef void sorting(cnp.ndarray[float, ndim=1] x):
 cdef float ecdf_distance(cnp.ndarray[float, ndim=1] data1, cnp.ndarray[float, ndim=1] data2):
     cdef cnp.ndarray[float, ndim=1] data_all = concat_cy(data1, data2)
     cdef float distance
-
     sorting(data_all)
     distance = searchsorted_max(data1, data2, data_all)
 
@@ -692,16 +692,15 @@ cdef int[:, ::1] get_shp_row_col_c((int, int) data, float complex[:, :, ::1] inp
     col_0 = data[1]
     length = input_slc.shape[1]
     width = input_slc.shape[2]
-
     t1 = 0
     t2 = def_sample_rows.shape[0]
     for i in range(def_sample_rows.shape[0]):
         temp = row_0 + def_sample_rows[i]
         if temp < 0:
             t1 += 1
-        if temp >= length and t2 == def_sample_rows.shape[0]:
-            t2 = i + 1
-
+        if temp >= length:
+            t2 = i
+            break
     s_rows = t2 - t1
     ref_row = reference_row - t1
 
@@ -715,9 +714,9 @@ cdef int[:, ::1] get_shp_row_col_c((int, int) data, float complex[:, :, ::1] inp
         temp = col_0 + def_sample_cols[i]
         if temp < 0:
             t1 += 1
-        if temp >= width and t2 == def_sample_cols.shape[0]:
-            t2 = i + 1
-
+        if temp >= width:
+            t2 = i
+            break
     s_cols = t2 - t1
     ref_col = reference_col - t1
 
@@ -727,10 +726,8 @@ cdef int[:, ::1] get_shp_row_col_c((int, int) data, float complex[:, :, ::1] inp
 
     for i in range(n_image):
         ref[i] = cabsf(input_slc[i, row_0, col_0])
-
     sorting(ref)
-    distance = np.zeros((s_rows, s_cols), dtype=long)
-
+    distance = np.zeros((s_rows, s_cols), dtype='long')
 
     if shp_test == b'ad':
         for t1 in range(s_rows):
@@ -758,7 +755,6 @@ cdef int[:, ::1] get_shp_row_col_c((int, int) data, float complex[:, :, ::1] inp
                 sorting(test)
                 distance[t1, t2] = ks2smapletest_cy(ref, test, distance_threshold)
 
-
     ks_label = clabel(distance, connectivity=2)
     ref_label = ks_label[ref_row, ref_col]
 
@@ -773,7 +769,6 @@ cdef int[:, ::1] get_shp_row_col_c((int, int) data, float complex[:, :, ::1] inp
                 shps[temp, 0] = sample_rows[t1]
                 shps[temp, 1] = sample_cols[t2]
                 temp += 1
-
     return shps
 
 cdef inline float[::1] mean_along_axis_x(float[:, ::1] x):
@@ -873,6 +868,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
             m += 1
 
     num_points = m
+
     prog_bar = ptime.progressBar(maxValue=num_points)
     p = 0
     for i in range(num_points):
@@ -881,16 +877,13 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
                                 range_window, reference_row, reference_col, distance_threshold, shp_test)
         num_shp = shp.shape[0]
         SHP[data[0] - row1, data[1] - col1] = num_shp
-
         CCG = np.zeros((n_image, num_shp), dtype=np.complex64)
         for t in range(num_shp):
             for m in range(n_image):
                 CCG[m, t] = patch_slc_images[m, shp[t,0], shp[t,1]]
 
         #CCG = normalize_samples(CCG)
-
         coh_mat = est_corr_cy(CCG)
-
         if num_shp > 20:
 
             if len(phase_linking_method) > 10 and phase_linking_method[0:10] == b'sequential':

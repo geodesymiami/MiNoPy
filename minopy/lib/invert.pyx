@@ -46,7 +46,12 @@ cdef void write_hdf5_block_3D(object fhandle, float complex[:, :, ::1] data, byt
     fhandle[datasetName.decode('UTF-8')][block[0]:block[1], block[2]:block[3], block[4]:block[5]] = data
     return
 
-cdef void write_hdf5_block_2D(object fhandle, float[:, ::1] data, bytes datasetName, list block):
+cdef void write_hdf5_block_2D_float(object fhandle, float[:, ::1] data, bytes datasetName, list block):
+
+    fhandle[datasetName.decode('UTF-8')][block[0]:block[1], block[2]:block[3]] = data
+    return
+
+cdef void write_hdf5_block_2D_int(object fhandle, int[:, ::1] data, bytes datasetName, list block):
 
     fhandle[datasetName.decode('UTF-8')][block[0]:block[1], block[2]:block[3]] = data
     return
@@ -247,67 +252,68 @@ cdef class CPhaseLink:
         cdef float[:, ::1] quality
 
         if os.path.exists(self.RSLCfile.decode('UTF-8')):
-            print('rslc_ref.h5 exists, skip unpatching ...')
+            print('Deleting old rslc_ref.h5 ...')
+            os.remove(self.RSLCfile.decode('UTF-8'))
+            #print('rslc_ref.h5 exists, skip unpatching ...')
 
-        else:
-            self.initiate_output()
-            print('open  HDF5 file rslc_ref.h5 in a mode')
+        self.initiate_output()
+        print('open  HDF5 file rslc_ref.h5 in a mode')
 
-            with h5py.File(self.RSLCfile.decode('UTF-8'), 'a') as fhandle:
-                for index, box in enumerate(self.box_list):
-                    patch_dir = self.out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
-                    rslc_ref = np.load(patch_dir.decode('UTF-8') + '/rslc_ref.npy')
-                    quality = np.load(patch_dir.decode('UTF-8') + '/quality.npy')
-                    shp = np.load(patch_dir.decode('UTF-8') + '/shp.npy')
+        with h5py.File(self.RSLCfile.decode('UTF-8'), 'a') as fhandle:
+            for index, box in enumerate(self.box_list):
+                patch_dir = self.out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
+                rslc_ref = np.load(patch_dir.decode('UTF-8') + '/rslc_ref.npy')
+                quality = np.load(patch_dir.decode('UTF-8') + '/quality.npy')
+                shp = np.load(patch_dir.decode('UTF-8') + '/shp.npy')
 
-                    print('-' * 50)
-                    print("unpatch block {}/{} : {}".format(index, self.num_box, box[0:4]))
+                print('-' * 50)
+                print("unpatch block {}/{} : {}".format(index, self.num_box, box[0:4]))
 
-                    # wrapped interferograms 3D
-                    block = [0, self.n_image, box[1], box[3], box[0], box[2]]
-                    write_hdf5_block_3D(fhandle, rslc_ref, b'slc', block)
+                # wrapped interferograms 3D
+                block = [0, self.n_image, box[1], box[3], box[0], box[2]]
+                write_hdf5_block_3D(fhandle, rslc_ref, b'slc', block)
 
-                    # SHP - 2D
-                    block = [box[1], box[3], box[0], box[2]]
-                    write_hdf5_block_2D(fhandle, shp, b'shp', block)
+                # SHP - 2D
+                block = [box[1], box[3], box[0], box[2]]
+                write_hdf5_block_2D_int(fhandle, shp, b'shp', block)
 
-                    # temporal coherence - 2D
-                    block = [box[1], box[3], box[0], box[2]]
-                    write_hdf5_block_2D(fhandle, quality, b'quality', block)
-
-
-                print('write shp file')
-                shp_file = self.work_dir + b'/shp'
-
-                if not os.path.exists(shp_file.decode('UTF-8')):
-                    shp_memmap = np.memmap(shp_file.decode('UTF-8'), mode='write', dtype='int32',
-                                               shape=(self.length, self.width))
-                    IML.renderISCEXML(shp_file.decode('UTF-8'), bands=1, nyy=self.length, nxx=self.width,
-                                      datatype='int32', scheme='BIL')
-                else:
-                    shp_memmap = np.memmap(shp_file.decode('UTF-8'), mode='r+', dtype='int32',
-                                               shape=(self.length, self.width))
-
-                shp_memmap[:, :] = fhandle['shp']
-                shp_memmap = None
+                # temporal coherence - 2D
+                block = [box[1], box[3], box[0], box[2]]
+                write_hdf5_block_2D_float(fhandle, quality, b'quality', block)
 
 
-                print('write quality file')
-                quality_file = self.out_dir + b'/quality'
+            print('write shp file')
+            shp_file = self.work_dir + b'/shp'
 
-                if not os.path.exists(quality_file.decode('UTF-8')):
-                    quality_memmap = np.memmap(quality_file.decode('UTF-8'), mode='write', dtype='float32',
-                                               shape=(self.length, self.width))
-                    IML.renderISCEXML(quality_file.decode('UTF-8'), bands=1, nyy=self.length, nxx=self.width,
-                                      datatype='float32', scheme='BIL')
-                else:
-                    quality_memmap = np.memmap(quality_file.decode('UTF-8'), mode='r+', dtype='float32',
-                                               shape=(self.length, self.width))
+            if not os.path.exists(shp_file.decode('UTF-8')):
+                shp_memmap = np.memmap(shp_file.decode('UTF-8'), mode='write', dtype='int',
+                                           shape=(self.length, self.width))
+                IML.renderISCEXML(shp_file.decode('UTF-8'), bands=1, nyy=self.length, nxx=self.width,
+                                  datatype='int32', scheme='BIL')
+            else:
+                shp_memmap = np.memmap(shp_file.decode('UTF-8'), mode='r+', dtype='int',
+                                           shape=(self.length, self.width))
 
-                quality_memmap[:, :] = fhandle['quality']
-                quality_memmap = None
+            shp_memmap[:, :] = fhandle['shp']
+            shp_memmap = None
 
-                print('close HDF5 file rslc_ref.h5.')
+
+            print('write quality file')
+            quality_file = self.out_dir + b'/quality'
+
+            if not os.path.exists(quality_file.decode('UTF-8')):
+                quality_memmap = np.memmap(quality_file.decode('UTF-8'), mode='write', dtype='float32',
+                                           shape=(self.length, self.width))
+                IML.renderISCEXML(quality_file.decode('UTF-8'), bands=1, nyy=self.length, nxx=self.width,
+                                  datatype='float32', scheme='BIL')
+            else:
+                quality_memmap = np.memmap(quality_file.decode('UTF-8'), mode='r+', dtype='float32',
+                                           shape=(self.length, self.width))
+
+            quality_memmap[:, :] = fhandle['quality']
+            quality_memmap = None
+
+            print('close HDF5 file rslc_ref.h5.')
         return
 
 
