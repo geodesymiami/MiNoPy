@@ -302,6 +302,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             frun.writelines(run_commands)
 
         inps = self.inps
+        inps.custom_template_file = self.customTemplateFile
         inps.work_dir = self.run_dir
         inps.out_dir = self.run_dir
         job_obj = JOB_SUBMIT(inps)
