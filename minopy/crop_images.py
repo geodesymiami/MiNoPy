@@ -20,7 +20,7 @@ from mintpy.utils import readfile, ptime, utils as ut
 from mintpy import subset
 import mintpy.load_data as mld
 from minopy.objects.utils import check_template_auto_value
-from minopy.objects.utils import read_attribute, coord_rev #print_write_setting
+from minopy.objects.utils import read_attribute, coord_rev, print_write_setting
 from minopy.objects.arg_parser import MinoPyParser
 
 #################################################################
@@ -68,7 +68,7 @@ def main(iargs=None):
     geomRadarObj, geomGeoObj = read_inps_dict2geometry_dict_object(iDict)
 
     # prepare write
-    updateMode, comp, box, boxGeo, xyStep, xyStepGeo = mld.print_write_setting(iDict)
+    updateMode, comp, box, boxGeo, xyStep, xyStepGeo = print_write_setting(iDict)
 
     if any([stackObj, geomRadarObj, geomGeoObj]) and not os.path.isdir(inps.out_dir):
         os.makedirs(inps.out_dir)
@@ -104,14 +104,13 @@ def main(iargs=None):
                               ystep=xyStepGeo[1],
                               compression='lzf')
 
-    reference_dir = os.path.dirname(iDict['MINOPY.load.metaFile'])
-    out_reference = inps.out_dir + '/reference'
+    reference_dir = inps.project_dir + '/reference'
     if not os.path.exists(out_reference):
-        shutil.copytree(reference_dir, out_reference)
+        shutil.copytree(reference_dir, os.path.dirname(iDict['MINOPY.load.metaFile']))
 
-    baseline_dir = inps.out_dir + '/baselines'
+    baseline_dir = inps.project_dir + '/baselines'
     if not os.path.exists(baseline_dir):
-        shutil.copytree(iDict['MINOPY.load.baselineDir'], baseline_dir)
+        shutil.copytree(baseline_dir, os.path.dirname(iDict['MINOPY.load.baselineDir']))
 
     return inps.out_file
 

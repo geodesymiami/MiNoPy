@@ -81,8 +81,14 @@ class MinoPyParser:
             print('{} -H to show the example template file'.format(os.path.basename(__file__)))
             sys.exit(1)
 
-        inps.out_file = [os.path.abspath(i) for i in inps.out_file]
-        inps.out_dir = os.path.dirname(inps.out_file[0])
+        inps.project_dir = os.path.abspath(inps.project_dir)
+        inps.PROJECT_NAME = os.path.basename(inps.project_dir)
+        inps.work_dir = os.path.join(inps.project_dir, 'minopy')
+        os.makedirs(inps.work_dir, exist_ok=True)
+        inps.out_dir = os.path.join(inps.work_dir, 'inputs')
+        os.makedirs(inps.out_dir, exist_ok=True)
+        inps.out_file = [os.path.join(inps.out_dir, i) for i in inps.out_file]
+
         return inps
 
     def out_minopy_app(self, sinps):
@@ -221,8 +227,8 @@ class MinoPyParser:
 
         EXAMPLE = """example:
           crop_images.py -t GalapagosSenDT128.tempalte
-          crop_images.py -t smallbaselineApp.cfg
-          crop_images.py -t smallbaselineApp.cfg GalapagosSenDT128.tempalte --project GalapagosSenDT128
+          crop_images.py -t minopy_template.cfg
+          crop_images.py -t GalapagosSenDT128.tempalte --project_dir $SCRATCH/GalapagosSenDT128
           crop_images.py -H #Show example input template for ISCE/ROI_PAC/GAMMA products
         """
 
@@ -234,8 +240,8 @@ class MinoPyParser:
         parser.add_argument('-t', '--template', type=str, nargs='+',
                             dest='template_file', help='template file with path info.')
 
-        parser.add_argument('--project', type=str, dest='PROJECT_NAME',
-                            help='project name of dataset for INSARMAPS Web Viewer')
+        parser.add_argument('--project_dir', type=str, dest='project_dir',
+                            help='project directory of dataset to crop')
         parser.add_argument('--processor', type=str, dest='processor',
                             choices={'isce', 'gamma', 'roipac'},
                             help='InSAR processor/software of the file (This version only supports isce)',
@@ -246,9 +252,9 @@ class MinoPyParser:
                             help='compress loaded geometry while writing HDF5 file, default: None.')
 
         parser.add_argument('-o', '--output', type=str, nargs=3, dest='out_file',
-                            default=['./inputs/slcStack.h5',
-                                     './inputs/geometryRadar.h5',
-                                     './inputs/geometryGeo.h5'],
+                            default=['slcStack.h5',
+                                     'geometryRadar.h5',
+                                     'geometryGeo.h5'],
                             help='output HDF5 file')
         return parser
 
