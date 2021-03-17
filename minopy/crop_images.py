@@ -52,7 +52,7 @@ def main(iargs=None):
 
     # read input options
     iDict = read_inps2dict(inps)
-
+    
     # prepare metadata
     prepare_metadata(iDict)
 
@@ -104,13 +104,16 @@ def main(iargs=None):
                               ystep=xyStepGeo[1],
                               compression='lzf')
 
-    reference_dir = inps.project_dir + '/reference'
-    if not os.path.exists(out_reference):
-        shutil.copytree(reference_dir, os.path.dirname(iDict['MINOPY.load.metaFile']))
 
-    baseline_dir = inps.project_dir + '/baselines'
-    if not os.path.exists(baseline_dir):
-        shutil.copytree(baseline_dir, os.path.dirname(iDict['MINOPY.load.baselineDir']))
+    reference_dir = os.path.dirname(iDict['MINOPY.load.metaFile'])
+    out_reference = inps.work_dir + '/inputs/reference'
+    if not os.path.exists(out_reference):
+        shutil.copytree(reference_dir, out_reference)
+
+    baseline_dir = os.path.abspath(iDict['MINOPY.load.baselineDir'])
+    out_baseline = inps.work_dir + '/inputs/baselines'
+    if not os.path.exists(out_baseline):
+        shutil.copytree(baseline_dir, out_baseline)
 
     return inps.out_file
 

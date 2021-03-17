@@ -288,7 +288,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         scp_args = '--template {}'.format(self.templateFile)
         if self.project_name:
-            scp_args += ' --project_dir {}'.format(self.project_name)
+            scp_args += ' --project_dir {}'.format(os.path.dirname(self.workDir))
 
         print('crop_images.py ', scp_args)
 
@@ -306,8 +306,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         job_obj = JOB_SUBMIT(inps)
         job_obj.write_batch_jobs(batch_file=run_file_crop)
 
-        if not inps.norun_flag:
-            job_status = job_obj.submit_batch_jobs(batch_file=run_file_crop)
+        if os.getenv('HOSTNAME') is None or job_obj.scheduler is None:
+            minopy.crop_images.main(scp_args.split())
 
         return
 
@@ -326,14 +326,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         num_pixels = int(metadata['length']) * int(metadata['width'])
 
         run_file_inversion = os.path.join(self.run_dir, 'run_02_phase_inversion')
-
-
-        #inps.memory = int(self.template['MINOPY.parallel.job_memory'])
-        #inps.wall_time = self.template['MINOPY.parallel.job_walltime']
         num_nodes = int(self.template['MINOPY.parallel.num_nodes'])
         num_workers = int(self.template['MINOPY.parallel.num_workers'])
-        #job_name = 'run_02_phase_inversion'
-        #job_file_name = 'run_02_phase_inversion_0'
 
         scp_args = '--workDir {a0} --rangeWin {a1} --azimuthWin {a2} --method {a3} --test {a4} ' \
                    '--patchSize {a5} --numWorker {a6}'.format(a0=self.workDir,
@@ -367,29 +361,18 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         else:
             os.makedirs(self.run_dir, exist_ok=True)
             print('phase_inversion.py ', scp_args)
+            command_line0 = '\ncp {} /tmp\n'.format(os.path.join(self.workDir, 'inputs/slcStack.h5'))
             command_line1 = command_line1 + ' --slcStack {a}'.format(a='/tmp/slcStack.h5')
             command_line2 = command_line2 + ' --slcStack {a}'.format(a='/tmp/slcStack.h5')
-            run_commands = []
-            run_commands.append(command_line1)
-            run_commands.append(command_line2)
+            command_line3 = '\nrm /tmp/slcStack.h5\n'
+            run_commands = command_line0 + command_line1 + command_line2 + command_line3
+            job_name = os.path.join(self.run_dir, 'run_02_phase_inversion.job')
 
-            with open(run_file_inversion, 'w+') as frun:
-                frun.writelines(run_commands)
-
-            job_obj.write_batch_jobs(batch_file=run_file_inversion,
-                                     distribute=os.path.join(self.workDir, 'inputs/slcStack.h5'))
+            job_obj.get_memory_walltime(job_name)
+            job_obj.write_single_job_file(job_name=job_name, job_file_name='run_02_phase_inversion',
+                                          command_line=run_commands, work_dir=self.run_dir, number_of_nodes=num_nodes)
 
             del job_obj
-
-            #os.makedirs(self.run_dir, exist_ok=True)
-            #scp_args = scp_args + ' --slcStack {a}'.format(a='/tmp/slcStack.h5')
-            #print('phase_inversion.py ', scp_args)
-            #command_line1 = command_line1 + ' --slcStack {a}'.format(a='/tmp/slcStack.h5')
-            #command_line2 = command_line2 + ' --slcStack {a}'.format(a='/tmp/slcStack.h5')
-            #command_line = command_line1 + command_line2
-            #job_obj.write_single_job_file(job_name, job_file_name, command_line,
-            #                      work_dir=self.run_dir, number_of_nodes=num_nodes,
-            #                      distribute=os.path.join(self.workDir, 'inputs/slcStack.h5'))
 
         return
 
