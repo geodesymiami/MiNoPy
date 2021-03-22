@@ -15,7 +15,7 @@ import numpy as np
 import minopy.minopy_utilities as mut
 from skimage.measure import label
 import h5py
-import gdal
+from osgeo import gdal
 from isceobj.Util.ImageUtil import ImageLib as IML
 import time
 

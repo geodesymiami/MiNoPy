@@ -19,7 +19,7 @@ import pickle
 from minopy.objects.arg_parser import MinoPyParser
 from minopy.objects import cluster_minopy
 import minopy.objects.inversion_utils as iut
-import gdal
+from osgeo import gdal
 import time
 
 
