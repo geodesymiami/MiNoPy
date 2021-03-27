@@ -258,6 +258,12 @@ def get_auto_path(processor, work_dir, template=dict()):
     if not os.path.exists(template['MINOPY.load.baselineDir']):
         template['MINOPY.load.baselineDir'] = os.path.join(work_dir, 'inputs/baselines')
 
+    if not os.path.exists(template['MINOPY.load.metaFile']):
+        if processor == 'isceTops':
+            template['MINOPY.load.metaFile'] = os.path.join(work_dir, 'inputs/reference/IW*.xml')
+        else:
+            template['MINOPY.load.metaFile'] = os.path.join(work_dir, 'inputs/reference/referenceShelve/data.dat')
+
     return template
 
 
