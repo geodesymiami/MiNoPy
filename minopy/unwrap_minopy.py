@@ -13,7 +13,7 @@ import isce
 from isceobj.Util.ImageUtil import ImageLib as IML
 from minopy.objects.arg_parser import MinoPyParser
 import numpy as np
-import gdal
+from osgeo import gdal
 import subprocess
 import time
 

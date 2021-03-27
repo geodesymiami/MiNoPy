@@ -12,7 +12,7 @@ import time
 import h5py
 import numpy as np
 from datetime import datetime
-import gdal
+from osgeo import gdal
 try:
     from skimage.transform import resize
 except ImportError:

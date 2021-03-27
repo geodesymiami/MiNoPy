@@ -1,8 +1,8 @@
-from distutils.core import setup
-from distutils.extension import Extension
+#from distutils.core import setup
+#from distutils.extension import Extension
 from Cython.Build import cythonize
 #from Cython.Distutils import build_ext
-#from setuptools import Extension, setup
+from setuptools import Extension, setup
 #from Cython.Build import cythonize
 import numpy
 

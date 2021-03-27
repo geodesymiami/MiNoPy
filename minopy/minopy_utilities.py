@@ -12,7 +12,7 @@ import datetime
 from scipy import linalg as LA
 from scipy.optimize import minimize
 from scipy.stats import ks_2samp, anderson_ksamp, ttest_ind
-import gdal
+from osgeo import gdal
 import isce
 import isceobj
 from mroipac.looks.Looks import Looks

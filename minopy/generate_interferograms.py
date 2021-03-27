@@ -12,7 +12,7 @@ import isceobj
 from isceobj.Image.IntImage import IntImage
 import numpy as np
 from minopy.objects.arg_parser import MinoPyParser
-import gdal
+from osgeo import gdal
 import h5py
 
 
