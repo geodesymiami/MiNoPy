@@ -492,8 +492,8 @@ cdef inline tuple sequential_phase_linking_cy(float complex[:,::1] full_stack_co
                                                            full_stack_complex_samples.shape[1]),
                                                            dtype=np.complex64)
 
-    quality = 1
-    temp_quality = 1
+    quality = 0
+    temp_quality = 0
 
     for sstep in range(total_num_mini_stacks):
 
@@ -525,13 +525,16 @@ cdef inline tuple sequential_phase_linking_cy(float complex[:,::1] full_stack_co
 
             res, squeezed_images_0, temp_quality = phase_linking_process_cy(mini_stack_complex_samples, sstep, method, True)
 
-        quality = fminf(temp_quality, quality)
+        #quality = fminf(temp_quality, quality)
+        quality = quality + temp_quality
 
         for i in range(num_lines):
             vec_refined[first_line + i] = res[sstep + i]
 
         for i in range(squeezed_images_0.shape[0]):
                 squeezed_images[sstep, i] = squeezed_images_0[i]
+
+    quality = quality / total_num_mini_stacks
 
     return vec_refined, squeezed_images, quality
 

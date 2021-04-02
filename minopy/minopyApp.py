@@ -294,11 +294,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         if self.project_name:
             scp_args += ' --project_dir {}'.format(os.path.dirname(self.workDir))
 
-        print(self.text_cmd, 'crop_images.py ', scp_args)
+        print('{} crop_images.py '.format(self.text_cmd.strip("'")), scp_args)
 
         os.makedirs(self.run_dir, exist_ok=True)
         run_file_crop = os.path.join(self.run_dir, 'run_01_minopy_crop')
-        run_commands = [self.text_cmd + 'crop_images.py ' + scp_args]
+        run_commands = ['{} crop_images.py '.format(self.text_cmd.strip("'")) + scp_args]
 
         with open(run_file_crop, 'w+') as frun:
             frun.writelines(run_commands)
@@ -344,9 +344,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         scp_args2 = scp_args + ' --unpatch'
 
-        command_line1 = self.text_cmd + '$MINOPY_HOME/minopy/phase_inversion.py {}'.format(scp_args)
+        command_line1 = '{} phase_inversion.py {}'.format(self.text_cmd.strip("'"), scp_args)
 
-        command_line2 = '\n' + self.text_cmd + '$MINOPY_HOME/minopy/phase_inversion.py {} --unpatch'.format(scp_args)
+        command_line2 = '\n{} phase_inversion.py {} --unpatch'.format(self.text_cmd.strip("'"), scp_args)
 
         inps.num_bursts = num_pixels // 40000 // num_workers
         job_obj = JOB_SUBMIT(inps)
@@ -357,15 +357,15 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
             scp_args = scp_args + ' --slcStack {a}'.format(a=os.path.join(self.workDir, 'inputs/slcStack.h5'))
             scp_args2 = scp_args2 + ' --slcStack {a}'.format(a=os.path.join(self.workDir, 'inputs/slcStack.h5'))
-            print(self.text_cmd + 'phase_inversion.py ', scp_args)
+            print('{} phase_inversion.py '.format(self.text_cmd.strip("'"), scp_args))
             minopy.phase_inversion.main(scp_args.split())
-            print(self.text_cmd + 'phase_inversion.py ', scp_args2)
+            print('{} phase_inversion.py '.format(self.text_cmd.strip("'"), scp_args2))
             minopy.phase_inversion.main(scp_args2.split())
 
         else:
             os.makedirs(self.run_dir, exist_ok=True)
-            print(self.text_cmd + 'phase_inversion.py ', scp_args)
-            command_line0 = '\ncp {} /tmp\n'.format(os.path.join(self.workDir, 'inputs/slcStack.h5'))
+            print('{} phase_inversion.py '.format(self.text_cmd.strip("'"), scp_args))
+            command_line0 = '\ncp {} /tmp\nunset LD_PRELOAD\n'.format(os.path.join(self.workDir, 'inputs/slcStack.h5'))
             command_line1 = command_line1 + ' --slcStack {a}'.format(a='/tmp/slcStack.h5')
             command_line2 = command_line2 + ' --slcStack {a}'.format(a='/tmp/slcStack.h5')
             command_line3 = '\nrm /tmp/slcStack.h5\n'
@@ -472,7 +472,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                            a7=sensor_type,
                                                            a8=rslc_ref)
 
-            cmd = self.text_cmd + 'generate_interferograms.py ' + scp_args
+            cmd = '{} generate_interferograms.py '.format(self.text_cmd.strip("'")) + scp_args
             if write_job is False:
                 cmd = cmd + ' &\n'
                 run_commands.append(cmd)
@@ -599,7 +599,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                                        a5=self.template['MINOPY.unwrap.init_method'],
                                                                        a6=length, a7=width, a8=height, a9= num_cpu,
                                                                        a10=earth_radius, a11=wavelength)
-            cmd = self.text_cmd + 'unwrap_minopy.py ' + scp_args
+            cmd = '{} unwrap_minopy.py '.format(self.text_cmd.strip("'")) + scp_args
 
             if write_job is False:
                 cmd = cmd + ' &\n'
@@ -650,7 +650,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             scp_args += ' --project {}'.format(self.projectName)
         scp_args += ' --output {}'.format(self.workDir + '/inputs/ifgramStack.h5')
         # run
-        print(self.text_cmd + "load_int.py", scp_args)
+        print('{} load_int.py'.format(self.text_cmd.strip("'")), scp_args)
         minopy.load_int.main(scp_args.split())
 
         # 3) check loading result
@@ -694,7 +694,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         coh_file = 'avgSpatialCoh.h5'
 
         scp_args = '{} -t {} -c {} --method maxCoherence'.format(stack_file, self.templateFile, coh_file)
-        print(self.text_cmd + 'reference_point.py', scp_args)
+        print('{} reference_point.py'.format(self.text_cmd.strip("'")), scp_args)
         mintpy.reference_point.main(scp_args.split())
         self.run_quick_overview(step_name)
 
@@ -712,7 +712,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         return
 
     def write_correction_job(self, sname):
-        run_commands = [self.text_cmd + 'minopyApp.py {} --start load_int'.format(self.templateFile)]
+        run_commands = ['{} minopyApp.py {} --start load_int'.format(self.text_cmd.strip("'"), self.templateFile)]
         os.makedirs(self.run_dir, exist_ok=True)
         run_file_corrections = os.path.join(self.run_dir, 'run_05_mintpy_corrections')
 

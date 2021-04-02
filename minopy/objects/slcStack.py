@@ -350,7 +350,7 @@ class slcStack:
             if box is None:
                 box = [0, 0, self.width, self.length]
 
-            data = ds[dateFlag, box[1]:box[3], box[0]:box[2]]
+            data = ds[np.where(dateFlag==True)[0], box[1]:box[3], box[0]:box[2]]
             data = np.squeeze(data)
         return data
 

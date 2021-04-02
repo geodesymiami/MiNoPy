@@ -200,9 +200,7 @@ def get_auto_path(processor, work_dir, template=dict()):
         if len(input_h5) > 0:
             with h5py.File(input_h5[0]) as f:
                 metadata = dict(f.attrs)
-            if not 'beam_mode' in metadata:
-                processor = 'isceStripmap'
-            elif metadata['beam_mode'] == 'SM':
+            if not 'beam_mode' in metadata or metadata['beam_mode'] == 'SM':
                 processor = 'isceStripmap'
                 template['sensor_type'] = 'stripmap'
             elif metadata['beam_mode'] == 'IW':
@@ -257,12 +255,14 @@ def get_auto_path(processor, work_dir, template=dict()):
         if value and template[key] == 'auto':
             template[key] = value
 
-    #if len(input_h5) > 0:
-    #    template['MINOPY.load.metaFile'] = os.path.join(work_dir, 'inputs/reference',
-    #                                                    os.path.basename(template['MINOPY.load.metaFile']))
-
     if not os.path.exists(template['MINOPY.load.baselineDir']):
         template['MINOPY.load.baselineDir'] = os.path.join(work_dir, 'inputs/baselines')
+
+    if not os.path.exists(template['MINOPY.load.metaFile']):
+        if processor == 'isceTops':
+            template['MINOPY.load.metaFile'] = os.path.join(work_dir, 'inputs/reference/IW*.xml')
+        else:
+            template['MINOPY.load.metaFile'] = os.path.join(work_dir, 'inputs/reference/referenceShelve/data.dat')
 
     return template
 
