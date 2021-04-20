@@ -1,6 +1,9 @@
 ## Install MiNoPy
 
 1. Set the following environment variables in your source file. It could be ~/.bash_profile file for bash user or ~/.cshrc file for csh/tcsh user.
+
+   ##### MinSAR is optional for those who use HPC job submission 
+
 ```
 if [ -z ${PYTHONPATH+x} ]; then export PYTHONPATH=""; fi
 
@@ -33,7 +36,7 @@ Use the [guide](https://github.com/isce-framework/isce2) or install with conda:\
 
 4. Install [SNAPHU](https://web.stanford.edu/group/radar/softwareandlinks/sw/snaphu/)
 
-5. Clone the repo [MinSAR](https://github.com/geodesymiami/rsmas_insar)\
+5. Clone the repo [MinSAR](https://github.com/geodesymiami/rsmas_insar) (optional)\
 `git clone https://github.com/geodesymiami/rsmas_insar.git $MINSAR_HOME`
 
 6. Clone the repo [MiNoPy](https://github.com/geodesymiami/minopy)\
