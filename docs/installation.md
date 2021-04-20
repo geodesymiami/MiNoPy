@@ -42,4 +42,4 @@ Use the [guide](https://github.com/isce-framework/isce2) or install with conda:\
 
 6. Clone the repo [MiNoPy](https://github.com/geodesymiami/MiNoPy)\
 `git clone https://github.com/geodesymiami/MiNoPy.git $MINOPY_HOME`\
-cd $MINOPY_HOME; ./install
+`cd $MINOPY_HOME; ./install`
