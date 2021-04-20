@@ -129,7 +129,7 @@ fi
 minopyApp_cmd=`which minopyApp.py`
 
 if [[ $crop_flag == "1" ]]; then
-    cmd="$minopyApp_cmd $template_file --dostep crop --norun"
+    cmd="$minopyApp_cmd $template_file --dostep crop --job"
     echo " Running.... python $cmd >& out_minopy_crop.e &"
     python $cmd >& out_minopy_crop.e &
     echo "$(date +"%Y%m%d:%H-%m") * $cmd" >> "${WORKDIR}"/log
@@ -146,7 +146,7 @@ fi
 
 
 if [[ $inversion_flag == "1" ]]; then
-    cmd="$minopyApp_cmd $template_file --dostep inversion --norun"
+    cmd="$minopyApp_cmd $template_file --dostep inversion --job"
     echo " Running.... python $cmd >& out_minopy_inversion.e &"
     python $cmd >& out_minopy_inversion.e &
     echo "$(date +"%Y%m%d:%H-%m") * $cmd" >> "${WORKDIR}"/log
@@ -162,7 +162,7 @@ if [[ $inversion_flag == "1" ]]; then
 fi
 
 if [[ $ifgrams_flag == "1" ]]; then
-    cmd="$minopyApp_cmd $template_file --dostep ifgrams --norun"
+    cmd="$minopyApp_cmd $template_file --dostep ifgrams --job"
     echo " Running.... python $cmd >& out_minopy_ifgrams.e &"
     python $cmd >& out_minopy_ifgrams.e &
     echo "$(date +"%Y%m%d:%H-%m") * $cmd" >> "${WORKDIR}"/log
@@ -178,7 +178,7 @@ if [[ $ifgrams_flag == "1" ]]; then
 fi
 
 if [[ $unwrap_flag == "1" ]]; then
-    cmd="$minopyApp_cmd $template_file --dostep unwrap --norun"
+    cmd="$minopyApp_cmd $template_file --dostep unwrap --job"
     echo " Running.... python $cmd >& out_minopy_unwrap.e &"
     python $cmd >& out_minopy_unwrap.e &
     echo "$(date +"%Y%m%d:%H-%m") * $cmd" >> "${WORKDIR}"/log
@@ -195,7 +195,7 @@ fi
 
 
 if [[ mintpy_corrections_flag == "1" ]]; then
-    cmd="$minopyApp_cmd $template_file --dostep write_correction_job --norun"
+    cmd="$minopyApp_cmd $template_file --dostep write_correction_job --job"
     echo " Running.... python $cmd >& out_mintpy_corrections.e &"
     python $cmd >& out_mintpy_corrections.e &
     echo "$(date +"%Y%m%d:%H-%m") * $cmd" >> "${WORKDIR}"/log

@@ -277,8 +277,8 @@ class MinoPyParser:
                            help='Number of parallel tasks (default: 1)')
         #patch.add_argument('--parallel', dest='parallel', action='store_true',
         #                   help='run in parallel with mpi if true')
-        patch.add_argument('--unpatch', dest='unpatch_flag', action='store_true',
-                           help='Do not process because it has finished in last run, just do un-patching')
+        #patch.add_argument('--unpatch', dest='unpatch_flag', action='store_true',
+        #                   help='Do not process because it has finished in last run, just do un-patching')
         #patch.add_argument('-b', '--bbox', type=str, dest='bbox', default=None,
         #                   help='subset area to process [x1, y1, x2, y2]')
        
@@ -292,22 +292,6 @@ class MinoPyParser:
         #                 help='Configuration name to use in dask.yaml (default: %(default)s).')
         return parser
 
-    @staticmethod
-    def patch_inversion_parser():
-
-        parser = argparse.ArgumentParser(description='patch inversion options')
-        parser.add_argument('-d', '--dataArg', dest='data_kwargs', type=str, required=True,
-                            help='dictionary of input arguments')
-        par = parser.add_argument_group('parallel', 'parallel processing using dask')
-        par.add_argument('-c', '--cluster', '--cluster-type', dest='cluster', type=str,
-                         default='local', choices=CLUSTER_LIST + ['no'],
-                         help='Cluster to use for parallel computing, no to turn OFF. (default: %(default)s).')
-        par.add_argument('--num-worker', dest='numWorker', type=str, default='4',
-                         help='Number of workers to use (default: %(default)s).')
-        par.add_argument('--config', '--config-name', dest='config', type=str, default=None,
-                         help='Configuration name to use in dask.yaml (default: %(default)s).')
-
-        return parser
 
     @staticmethod
     def unwrap_parser():
@@ -362,15 +346,14 @@ class MinoPyParser:
 
     @staticmethod
     def minopy_app_parser():
-
         STEP_LIST = [
             'crop',
             'inversion',
             'ifgrams',
             'unwrap',
-            'write_correction_job',
             'load_int',
             'reference_point',
+            'quick_overview',
             'correct_unwrap_error',
             'write_to_timeseries',
             'correct_SET',
@@ -382,9 +365,8 @@ class MinoPyParser:
             'velocity',
             'geocode',
             'google_earth',
-            'hdfeos5',
-            'plot',
-            'email', ]
+            'hdfeos5']
+
 
         STEP_HELP = """Command line options for steps processing with names are chosen from the following list:
         {}
@@ -439,8 +421,8 @@ class MinoPyParser:
                           help='end processing at the named step, default: {}'.format(STEP_LIST[-1]))
         step.add_argument('--dostep', dest='doStep', metavar='STEP',
                           help='run processing at the named step only')
-        step.add_argument('--norun', dest='norun_flag', action='store_true',
-                          help=' do not run jobs created in [inversion, ifgrams, unwrap] steps, only write them')
+        step.add_argument('--job', dest='write_job', action='store_true',
+                          help=' do not run tasks created in [inversion, ifgrams, unwrap] steps, only write their job')
 
         return parser, STEP_LIST
 

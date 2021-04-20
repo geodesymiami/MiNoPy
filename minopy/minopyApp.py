@@ -18,12 +18,12 @@ import shutil
 import h5py
 import re
 import math
-import subprocess
+#import subprocess
 
 import minopy
 import minopy.workflow
 from mintpy.utils import writefile, readfile, utils as ut
-from minsar.job_submission import JOB_SUBMIT
+#from minsar.job_submission import JOB_SUBMIT
 import mintpy
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
 import minopy.minopy_utilities as mut
@@ -41,6 +41,7 @@ STEP_LIST = [
     'unwrap',
     'load_int',
     'reference_point',
+    'quick_overview',
     'correct_unwrap_error',
     'write_to_timeseries',
     'correct_SET',
@@ -52,10 +53,8 @@ STEP_LIST = [
     'velocity',
     'geocode',
     'google_earth',
-    'hdfeos5',
-    'plot',]
+    'hdfeos5']
 
-#'email',]
 
 ##########################################################################
 
@@ -76,52 +75,18 @@ def main(iargs=None):
     app = minopyTimeSeriesAnalysis(inps.customTemplateFile, inps.workDir, inps)
     app.startup
     if len(inps.runSteps) > 0:
-        app.run(steps=inps.runSteps, plot=inps.plot)
+        app.run(steps=inps.runSteps)
+
+    if inps.plot or (app.template['mintpy.plot'] and len(inps.runSteps) > 1):
+        app.plot_result()
+
+    app.close()
 
     # Timing
     m, s = divmod(time.time()-start_time, 60)
     print('Time used: {:02.0f} mins {:02.1f} secs\n'.format(m, s))
     return
 
-
-def write_single_job_file(jobObj, job_name, job_file_name, command_line, work_dir=None, number_of_nodes=1, distribute=None):
-    """
-    Writes a job file for a single job.
-    :param job_name: Name of job.
-    :param job_file_name: Name of job file.
-    :param command_line: Command line containing process to run.
-    :param work_dir: working or output directory
-    """
-    import subprocess
-
-    # get lines to write in job file
-    job_file_lines = jobObj.get_job_file_lines(job_name, job_file_name, work_dir=work_dir,
-                                               number_of_nodes=number_of_nodes)
-    job_file_lines.append("\nfree")
-
-    if jobObj.scheduler == 'SLURM':
-        hostname = subprocess.Popen("hostname", shell=True, stdout=subprocess.PIPE).stdout.read().decode("utf-8")
-        job_file_lines.append("\nsmodule load python_cacher \n")
-        job_file_lines.append("export PYTHON_IO_CACHE_CWD=0\n")
-        job_file_lines.append("module load ooops\n")
-
-        if not distribute is None:
-            if 'stampede2' in hostname:
-                job_file_lines.append('\nexport CDTOOL=/scratch/01255/siliu/collect_distribute\n')
-            elif 'frontera' in hostname:
-                job_file_lines.append('\nexport CDTOOL=/scratch1/01255/siliu/collect_distribute\n')
-
-            job_file_lines.append('export PATH=${PATH}:${CDTOOL}/bin\n')
-            job_file_lines.append('distribute.bash ' + distribute + '\n')
-
-    job_file_lines.append("\n" + command_line + "\n")
-
-    # write lines to .job file
-    job_file_name = "{0}.job".format(job_file_name)
-    with open(os.path.join(work_dir, job_file_name), "w+") as job_file:
-        job_file.writelines(job_file_lines)
-
-    return
 
 class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
     """ Routine processing workflow for time series analysis of InSAR stacks with MiNoPy
@@ -130,6 +95,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
     def __init__(self, customTemplateFile=None, workDir=None, inps=None):
         super().__init__(customTemplateFile, workDir)
         self.inps = inps
+        self.write_job = inps.write_job
 
         self.customTemplateFile = customTemplateFile
         self.cwd = os.path.abspath(os.getcwd())
@@ -162,6 +128,10 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         self.status = False
         self.azimuth_look = 1
         self.range_look = 1
+
+        self.hostname = os.getenv('HOSTNAME')
+        if not self.hostname is None and self.hostname.startswith('login'):
+            self.hostname = 'login'
 
     @property
     def startup(self):
@@ -210,6 +180,10 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         self.text_cmd = self.template['MINOPY.textCmd']
         if self.text_cmd in [None, 'None']:
             self.text_cmd = ''
+
+        self.num_workers = int(self.template['MINOPY.parallel.num_workers'])
+        self.num_nodes = int(self.template['MINOPY.parallel.num_nodes'])
+
 
         return
 
@@ -303,15 +277,19 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         with open(run_file_crop, 'w+') as frun:
             frun.writelines(run_commands)
 
-        inps = self.inps
-        inps.custom_template_file = self.customTemplateFile
-        inps.work_dir = self.run_dir
-        inps.out_dir = self.run_dir
-        job_obj = JOB_SUBMIT(inps)
-        job_obj.write_batch_jobs(batch_file=run_file_crop)
-
-        if os.getenv('HOSTNAME') is None or job_obj.scheduler is None:
+        if not self.write_job and not self.hostname is 'login':
             minopy.crop_images.main(scp_args.split())
+        else:
+            from minsar.job_submission import JOB_SUBMIT
+            inps = self.inps
+            inps.custom_template_file = self.customTemplateFile
+            inps.work_dir = self.run_dir
+            inps.out_dir = self.run_dir
+            job_obj = JOB_SUBMIT(inps)
+            job_obj.write_batch_jobs(batch_file=run_file_crop)
+
+        #if os.getenv('HOSTNAME') is None or job_obj.scheduler is None:
+        #    minopy.crop_images.main(scp_args.split())
 
         return
 
@@ -330,8 +308,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         num_pixels = int(metadata['length']) * int(metadata['width'])
 
         run_file_inversion = os.path.join(self.run_dir, 'run_02_phase_inversion')
-        num_nodes = int(self.template['MINOPY.parallel.num_nodes'])
-        num_workers = int(self.template['MINOPY.parallel.num_workers'])
 
         scp_args = '--workDir {a0} --rangeWin {a1} --azimuthWin {a2} --method {a3} --test {a4} ' \
                    '--patchSize {a5} --numWorker {a6}'.format(a0=self.workDir,
@@ -340,43 +316,35 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                               a3=self.template['MINOPY.inversion.plmethod'],
                                                               a4=self.template['MINOPY.inversion.shp_test'],
                                                               a5=self.template['MINOPY.inversion.patch_size'],
-                                                              a6=num_workers)
+                                                              a6=self.num_workers)
 
-        scp_args2 = scp_args + ' --unpatch'
 
         command_line1 = '{} phase_inversion.py {}'.format(self.text_cmd.strip("'"), scp_args)
 
-        command_line2 = '\n{} phase_inversion.py {} --unpatch'.format(self.text_cmd.strip("'"), scp_args)
+        inps.num_bursts = num_pixels // 40000 // self.num_workers
 
-        inps.num_bursts = num_pixels // 40000 // num_workers
-        job_obj = JOB_SUBMIT(inps)
-
-        if os.getenv('HOSTNAME') is None or job_obj.scheduler is None:
-
-            del job_obj
-
+        if not self.write_job and not self.hostname is 'login':
             scp_args = scp_args + ' --slcStack {a}'.format(a=os.path.join(self.workDir, 'inputs/slcStack.h5'))
-            scp_args2 = scp_args2 + ' --slcStack {a}'.format(a=os.path.join(self.workDir, 'inputs/slcStack.h5'))
             print('{} phase_inversion.py '.format(self.text_cmd.strip("'"), scp_args))
             minopy.phase_inversion.main(scp_args.split())
-            print('{} phase_inversion.py '.format(self.text_cmd.strip("'"), scp_args2))
-            minopy.phase_inversion.main(scp_args2.split())
-
         else:
+            from minsar.job_submission import JOB_SUBMIT
+            job_obj = JOB_SUBMIT(inps)
             os.makedirs(self.run_dir, exist_ok=True)
             print('{} phase_inversion.py '.format(self.text_cmd.strip("'"), scp_args))
             command_line0 = '\ncp {} /tmp\nunset LD_PRELOAD\n'.format(os.path.join(self.workDir, 'inputs/slcStack.h5'))
             command_line1 = command_line1 + ' --slcStack {a}'.format(a='/tmp/slcStack.h5')
-            command_line2 = command_line2 + ' --slcStack {a}'.format(a='/tmp/slcStack.h5')
-            command_line3 = '\nrm /tmp/slcStack.h5\n'
-            run_commands = command_line0 + command_line1 + command_line2 + command_line3
+            command_line2 = '\nrm /tmp/slcStack.h5\n'
+            run_commands = command_line0 + command_line1 + command_line2
             job_name = os.path.join(self.run_dir, 'run_02_phase_inversion.job')
 
             job_obj.get_memory_walltime(job_name)
             job_obj.write_single_job_file(job_name=job_name, job_file_name='run_02_phase_inversion',
-                                          command_line=run_commands, work_dir=self.run_dir, number_of_nodes=num_nodes)
+                                          command_line=run_commands, work_dir=self.run_dir,
+                                          number_of_nodes=self.num_nodes)
 
             del job_obj
+        #if os.getenv('HOSTNAME') is None or job_obj.scheduler is None:
 
         return
 
@@ -414,25 +382,28 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             reference_ind = date_list.index(reference_date)
 
         pairs = []
-        if reference_ind == 'multi':
-            indx = date_list.index(reference_date)
-            for i in range(0, len(date_list)):
-                if not indx == i:
-                    pairs.append((date_list[indx], date_list[i]))
-                if not i == 0:
-                    pairs.append((date_list[i - 1], date_list[i]))
+        if not self.template['MINOPY.interferograms.list'] in [None, 'None']:
+            with open(self.template['MINOPY.interferograms.list'], 'r') as f:
+                lines = f.readlines()
+            for line in lines:
+                pairs.append((line.split('_')[0], line.split('\n')[0].split('_')[1]))
         else:
-            for i in range(0, len(date_list)):
-                if not reference_ind is None:
-                    if not reference_ind == i:
-                        pairs.append((date_list[reference_ind], date_list[i]))
-                else:
+            if reference_ind == 'multi':
+                indx = date_list.index(reference_date)
+                for i in range(0, len(date_list)):
+                    if not indx == i:
+                        pairs.append((date_list[indx], date_list[i]))
                     if not i == 0:
                         pairs.append((date_list[i - 1], date_list[i]))
+            else:
+                for i in range(0, len(date_list)):
+                    if not reference_ind is None:
+                        if not reference_ind == i:
+                            pairs.append((date_list[reference_ind], date_list[i]))
+                    else:
+                        if not i == 0:
+                            pairs.append((date_list[i - 1], date_list[i]))
         pairs = list(set(pairs))
-        # if reference_ind is False:
-        #    pairs.append((date_list[0], date_list[-1]))
-
 
         inps = self.inps
         inps.run_dir = self.run_dir
@@ -443,18 +414,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         run_ifgs = os.path.join(inps.run_dir, 'run_03_minopy_ifgrams')
         run_commands = []
 
-        inps.work_dir = inps.run_dir
-        inps.out_dir = inps.run_dir
-        inps.custom_template_file = self.customTemplateFile
-        job_obj = JOB_SUBMIT(inps)
-
         rslc_ref = os.path.join(self.workDir, 'inverted/rslc_ref.h5')
-
-        if os.getenv('HOSTNAME') is None or job_obj.scheduler is None:
-            write_job = False
-            del job_obj
-        else:
-            write_job = True
 
         num_cpu = os.cpu_count()
         num_lin = 0
@@ -473,7 +433,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                            a8=rslc_ref)
 
             cmd = '{} generate_interferograms.py '.format(self.text_cmd.strip("'")) + scp_args
-            if write_job is False:
+            if not self.write_job:
                 cmd = cmd + ' &\n'
                 run_commands.append(cmd)
                 num_lin += 1
@@ -489,11 +449,17 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         with open(run_ifgs, 'w+') as frun:
             frun.writelines(run_commands)
 
-        if write_job:
+        if not self.write_job and not self.hostname is 'login':
+            os.system('bash {}'.format(run_ifgs))
+            #status = subprocess.Popen('bash {}'.format(run_ifgs), stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
+        else:
+            from minsar.job_submission import JOB_SUBMIT
+            inps.work_dir = inps.run_dir
+            inps.out_dir = inps.run_dir
+            inps.custom_template_file = self.customTemplateFile
+            job_obj = JOB_SUBMIT(inps)
             job_obj.write_batch_jobs(batch_file=run_ifgs)
             del job_obj
-        else:
-            status = subprocess.Popen(run_commands, stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
 
         return
 
@@ -525,21 +491,27 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             reference_ind = date_list.index(reference_date)
 
         pairs = []
-        if reference_ind == 'multi':
-            indx = date_list.index(reference_date)
-            for i in range(0, len(date_list)):
-                if not indx == i:
-                    pairs.append((date_list[indx], date_list[i]))
-                if not i == 0:
-                    pairs.append((date_list[i - 1], date_list[i]))
+        if not self.template['MINOPY.interferograms.list'] in [None, 'None']:
+            with open(self.template['MINOPY.interferograms.list'], 'r') as f:
+                lines = f.readlines()
+            for line in lines:
+                pairs.append((line.split('_')[0], line.split('\n')[0].split('_')[1]))
         else:
-            for i in range(0, len(date_list)):
-                if not reference_ind is None:
-                    if not reference_ind == i:
-                        pairs.append((date_list[reference_ind], date_list[i]))
-                else:
+            if reference_ind == 'multi':
+                indx = date_list.index(reference_date)
+                for i in range(0, len(date_list)):
+                    if not indx == i:
+                        pairs.append((date_list[indx], date_list[i]))
                     if not i == 0:
                         pairs.append((date_list[i - 1], date_list[i]))
+            else:
+                for i in range(0, len(date_list)):
+                    if not reference_ind is None:
+                        if not reference_ind == i:
+                            pairs.append((date_list[reference_ind], date_list[i]))
+                    else:
+                        if not i == 0:
+                            pairs.append((date_list[i - 1], date_list[i]))
         pairs = list(set(pairs))
 
         # if reference_ind is False:
@@ -553,19 +525,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         inps.template = self.template
         run_file_unwrap = os.path.join(self.run_dir, 'run_04_minopy_un-wrap')
         run_commands = []
-
-        inps.work_dir = inps.run_dir
-        inps.out_dir = inps.run_dir
-        inps.custom_template_file = self.customTemplateFile
-        inps.num_bursts = num_pixels // 3000000
-        print('num bursts: {}'.format(inps.num_bursts))
-        job_obj = JOB_SUBMIT(inps)
-
-        if os.getenv('HOSTNAME') is None or job_obj.scheduler is None:
-            write_job = False
-            del job_obj
-        else:
-            write_job = True
 
         num_cpu = os.cpu_count()
         ntiles = num_pixels / 2000000
@@ -601,7 +560,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                                        a10=earth_radius, a11=wavelength)
             cmd = '{} unwrap_minopy.py '.format(self.text_cmd.strip("'")) + scp_args
 
-            if write_job is False:
+            if not self.write_job:
                 cmd = cmd + ' &\n'
                 run_commands.append(cmd)
                 num_lin += 1
@@ -620,12 +579,19 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         with open(run_file_unwrap, 'w+') as frun:
             frun.writelines(run_commands)
 
-        if write_job:
-
+        if not self.write_job and not self.hostname is 'login':
+            os.system('bash {}'.format(run_file_unwrap))
+            #status = subprocess.Popen(run_commands, stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
+        else:
+            from minsar.job_submission import JOB_SUBMIT
+            inps.work_dir = inps.run_dir
+            inps.out_dir = inps.run_dir
+            inps.custom_template_file = self.customTemplateFile
+            inps.num_bursts = num_pixels // 3000000
+            print('num bursts: {}'.format(inps.num_bursts))
+            job_obj = JOB_SUBMIT(inps)
             job_obj.write_batch_jobs(batch_file=run_file_unwrap, num_cores_per_task=num_cpu)
             del job_obj
-        else:
-            status = subprocess.Popen(run_commands, stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
 
         return
 
@@ -681,37 +647,19 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             raise RuntimeError(msg)
         return
 
-    def run_reference_point(self, step_name):
-        """Select reference point.
-        It 1) generate mask file from common conn comp
-           2) generate average spatial coherence and its mask
-           3) add REF_X/Y and/or REF_LAT/LON attribute to stack file
-        """
-        self.run_network_modification(step_name)
-        self.generate_ifgram_aux_file()
-
-        stack_file = ut.check_loaded_dataset(self.workDir, print_msg=False)[1]
-        coh_file = 'avgSpatialCoh.h5'
-
-        scp_args = '{} -t {} -c {} --method maxCoherence'.format(stack_file, self.templateFile, coh_file)
-        print('{} reference_point.py'.format(self.text_cmd.strip("'")), scp_args)
-        mintpy.reference_point.main(scp_args.split())
-        self.run_quick_overview(step_name)
-
-        return
-
     def write_to_timeseries(self, sname):
         if self.azimuth_look * self.range_look > 1:
             self.template['quality_file'] = os.path.join(self.workDir, 'inverted/quality_ml')
         else:
             self.template['quality_file'] = os.path.join(self.workDir, 'inverted/quality')
-        mut.invert_ifgrams_to_timeseries(self.template, self.inps, self.workDir, writefile)
+        mut.invert_ifgrams_to_timeseries(self.template, self.inps, self.workDir, writefile, self.num_workers)
         functions = [mintpy.generate_mask, readfile, ut.run_or_skip, ut.add_attribute]
         mut.get_phase_linking_coherence_mask(self.template, self.workDir, functions)
 
         return
 
     def write_correction_job(self, sname):
+        from minsar.job_submission import JOB_SUBMIT
         run_commands = ['{} minopyApp.py {} --start load_int'.format(self.text_cmd.strip("'"), self.templateFile)]
         os.makedirs(self.run_dir, exist_ok=True)
         run_file_corrections = os.path.join(self.run_dir, 'run_05_mintpy_corrections')
@@ -728,7 +676,28 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         return
 
-    def run(self, steps=STEP_LIST, plot=True):
+    def run_topographic_residual_correction(self, sname):
+        """step - correct_topography
+        Topographic residual (DEM error) correction (optional).
+        """
+        geom_file = ut.check_loaded_dataset(self.workDir, print_msg=False)[2]
+        fnames = self.get_timeseries_filename(self.template, self.workDir)[sname]
+        in_file = fnames['input']
+        out_file = fnames['output']
+
+        if in_file != out_file:
+            iargs = [in_file, '-t', self.templateFile, '-o', out_file, '--update',
+                     '--cluster', 'local', '--num-worker', str(self.num_workers)]
+            if self.template['mintpy.topographicResidual.pixelwiseGeometry']:
+                iargs += ['-g', geom_file]
+            print('\ndem_error.py', ' '.join(iargs))
+            mintpy.dem_error.main(iargs)
+
+        else:
+            print('No topographic residual correction.')
+        return
+
+    def run(self, steps=STEP_LIST):
         for sname in steps:
             print('\n\n******************** step - {} ********************'.format(sname))
 
@@ -757,8 +726,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                     f.attrs['mintpy.reference.yx'] = self.template['mintpy.reference.yx']
                     f.attrs['mintpy.reference.lalo'] = self.template['mintpy.reference.lalo']
                 f.close()
+                super().run_network_modification(sname)
+                super().run_reference_point(sname)
 
-                self.run_reference_point(sname)
+            elif sname == 'quick_overview':
+                super().run_quick_overview(sname)
 
             elif sname == 'correct_unwrap_error':
                 super().run_unwrap_error_correction(sname)
@@ -776,7 +748,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 super().run_phase_deramping(sname)
 
             elif sname == 'correct_topography':
-                super().run_topographic_residual_correction(sname)
+                self.run_topographic_residual_correction(sname)
 
             elif sname == 'residual_RMS':
                 super().run_residual_phase_rms(sname)
@@ -796,14 +768,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             elif sname == 'hdfeos5':
                 super().run_save2hdfeos5(sname)
 
-            elif sname == 'plot':
-                # plot result (show aux visualization message more multiple steps processing)
-                print_aux = len(steps) > 1
-                super().plot_result(print_aux=print_aux, plot=plot)
-
-            #elif sname == 'email':
-            #    mut.email_minopy(self.workDir)
-
         # go back to original directory
         print('Go back to directory:', self.cwd)
         os.chdir(self.cwd)
@@ -813,6 +777,18 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         msg += '\nNormal end of Non-Linear time series processing workflow!'
         msg += '\n##############################################################'
         print(msg)
+        return
+
+    def close(self, normal_end=True):
+        # go back to original directory
+        print('Go back to directory:', self.cwd)
+        os.chdir(self.cwd)
+        # message
+        if normal_end:
+            msg  = '\n################################################'
+            msg += '\n   Normal end of minopyApp processing!'
+            msg += '\n################################################'
+            print(msg)
         return
 
 

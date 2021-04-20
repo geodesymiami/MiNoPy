@@ -20,7 +20,7 @@ import glob
 import shutil
 import warnings
 import h5py
-from mintpy.objects import timeseries, ifgramStack
+from mintpy.objects import timeseries, ifgramStack, cluster
 from mintpy.ifgram_inversion import split2boxes, read_unwrap_phase, mask_unwrap_phase
 ################################################################################
 
@@ -855,8 +855,7 @@ def email_minopy(work_dir):
 
 #################################
 
-
-def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile):
+def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile, num_workers=1):
 
     ## 1. input info
     inps = inps_dict
@@ -958,68 +957,45 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile):
     quality_name = template['quality_file']
     quality = np.memmap(quality_name, mode='r', dtype='float32', shape=(length, width))
 
+    data_kwargs = {
+        "stack_obj": stack_obj,
+        "ref_phase": ref_phase,
+        "unwDatasetName": unwDatasetName,
+        "mask_dataset_name": mask_dataset_name,
+        "mask_threshold": mask_threshold,
+        "date12_list": date12_list,
+        "reference_ind": reference_ind
+    }
+
     for i in range(num_box):
         box = box_list[i]
-        num_row = box[3] - box[1]
-        num_col = box[2] - box[0]
-        num_pixel = num_row * num_col
+        data_kwargs['box'] = box
+        box_len = box[3] - box[1]
+        box_wid = box[2] - box[0]
 
-        temp_coh = quality[box[1]:box[3], box[0]:box[2]]
-
-        print('\n------- Processing Patch {} out of {} --------------'.format(i + 1, num_box))
-
-        # Read/Mask unwrapPhase
-        pha_data = read_unwrap_phase(stack_obj,
-                                     box,
-                                     ref_phase,
-                                     obs_ds_name=unwDatasetName,
-                                     dropIfgram=True)
-
-        pha_data = mask_unwrap_phase(pha_data,
-                                     stack_obj,
-                                     box,
-                                     dropIfgram=True,
-                                     mask_ds_name=mask_dataset_name,
-                                     mask_threshold=mask_threshold)
-
-        # Mask for pixels to invert
-        mask = np.ones(num_pixel, np.bool_)
-
-        # Mask for Zero Phase in ALL ifgrams
-        if 'phase' in unwDatasetName.lower():
-            print('skip pixels with zero/nan value in all interferograms')
-            with warnings.catch_warnings():
-                # ignore warning message for all-NaN slices
-                warnings.simplefilter("ignore", category=RuntimeWarning)
-                phase_stack = np.nanmean(pha_data, axis=0)
-            mask *= np.multiply(~np.isnan(phase_stack), phase_stack != 0.)
-            del phase_stack
-
-        num_pixel2inv = int(np.sum(mask))
-        idx_pixel2inv = np.where(mask)[0]
-        print('number of pixels to invert: {} out of {} ({:.1f}%)'.format(
-            num_pixel2inv, num_pixel, num_pixel2inv / num_pixel * 100))
-
-        # initiale the output matrices
-        ts = np.zeros((num_date, num_pixel), np.float32)
-        num_inv_ifg = np.zeros((num_row, num_col), np.int16) + num_ifgram
-
-        if num_pixel2inv < 1:
-            ts = ts.reshape(num_date, num_row, num_col)
+        if num_workers == 1:
+            ts, num_inv_ifg = transform_patch(**data_kwargs)[:-1]
         else:
+            # parallel
+            print('\n\n------- start parallel processing using Dask -------')
 
-            # Mask for Non-Zero Phase in ALL ifgrams (share one B in sbas inversion)
-            mask_all_net = np.all(pha_data, axis=0)
-            mask_all_net *= mask
-            # mask_all_net *= mask_Coh
-            idx_pixel2inv = np.where(mask_all_net)[0]
+            # initiate the output data
+            ts = np.zeros((num_date, box_len, box_wid), np.float32)
+            num_inv_ifg = np.zeros((box_len, box_wid), np.float32)
 
-            if np.sum(mask_all_net) > 0:
-                tsi = LA.lstsq(A, pha_data[:, mask_all_net], cond=1e-5)[0]
+            # initiate dask cluster and client
+            cluster_obj = cluster.DaskCluster('local', num_workers)
+            cluster_obj.open()
 
-            ts[0:reference_ind, idx_pixel2inv] = tsi[0:reference_ind, :]
-            ts[reference_ind + 1::, idx_pixel2inv] = tsi[reference_ind::, :]
-            ts = ts.reshape(num_date, num_row, num_col)
+            # run dask
+            ts, num_inv_ifg = cluster_obj.run(func=transform_patch,
+                                              func_data=data_kwargs,
+                                              results=[ts, num_inv_ifg])
+
+            # close dask cluster and client
+            cluster_obj.close()
+
+            print('------- finished parallel processing -------\n\n')
 
         print('converting phase to range')
         ts *= phase2range
@@ -1032,6 +1008,7 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile):
 
         # temporal coherence - 2D
         block = [box[1], box[3], box[0], box[2]]
+        temp_coh = quality[box[1]:box[3], box[0]:box[2]]
         writefile.write_hdf5_block(inps.tempCohFile,
                                    data=temp_coh,
                                    datasetName='temporalCoherence',
@@ -1056,6 +1033,72 @@ def invert_ifgrams_to_timeseries(template, inps_dict, work_dir, writefile):
         with h5py.File(inps.tempCohFile, 'r+') as f:
             f['temporalCoherence'][ref_y, ref_x] = 1.
     return
+
+
+def transform_patch(stack_obj, box=None, ref_phase=None, unwDatasetName='unwrapPhase',
+                    mask_dataset_name=None, mask_threshold=0.5,
+                    date12_list=None, reference_ind=None):
+    # Read/Mask unwrapPhase
+    pha_data = read_unwrap_phase(stack_obj,
+                                 box,
+                                 ref_phase,
+                                 obs_ds_name=unwDatasetName,
+                                 dropIfgram=True)
+
+    pha_data = mask_unwrap_phase(pha_data,
+                                 stack_obj,
+                                 box,
+                                 dropIfgram=True,
+                                 mask_ds_name=mask_dataset_name,
+                                 mask_threshold=mask_threshold)
+
+    # Mask for pixels to invert
+    num_row = box[3] - box[1]
+    num_col = box[2] - box[0]
+    num_pixel = num_row * num_col
+    mask = np.ones(num_pixel, np.bool_)
+
+    A = stack_obj.get_design_matrix4timeseries(date12_list)[0]
+    num_ifgram, num_date = A.shape[0], A.shape[1] + 1
+
+    # Mask for Zero Phase in ALL ifgrams
+    if 'phase' in unwDatasetName.lower():
+        print('skip pixels with zero/nan value in all interferograms')
+        with warnings.catch_warnings():
+            # ignore warning message for all-NaN slices
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            phase_stack = np.nanmean(pha_data, axis=0)
+        mask *= np.multiply(~np.isnan(phase_stack), phase_stack != 0.)
+        del phase_stack
+
+    num_pixel2inv = int(np.sum(mask))
+    idx_pixel2inv = np.where(mask)[0]
+    print('number of pixels to invert: {} out of {} ({:.1f}%)'.format(
+        num_pixel2inv, num_pixel, num_pixel2inv / num_pixel * 100))
+
+    # initiale the output matrices
+    ts = np.zeros((num_date, num_pixel), np.float32)
+    num_inv_ifg = np.zeros((num_row, num_col), np.int16) + num_ifgram
+
+    if num_pixel2inv < 1:
+        ts = ts.reshape(num_date, num_row, num_col)
+    else:
+
+        # Mask for Non-Zero Phase in ALL ifgrams (share one B in sbas inversion)
+        mask_all_net = np.all(pha_data, axis=0)
+        mask_all_net *= mask
+        # mask_all_net *= mask_Coh
+        idx_pixel2inv = np.where(mask_all_net)[0]
+
+        if np.sum(mask_all_net) > 0:
+            tsi = LA.lstsq(A, pha_data[:, mask_all_net], cond=1e-5)[0]
+
+        ts[0:reference_ind, idx_pixel2inv] = tsi[0:reference_ind, :]
+        ts[reference_ind + 1::, idx_pixel2inv] = tsi[reference_ind::, :]
+        ts = ts.reshape(num_date, num_row, num_col)
+
+    return ts, num_inv_ifg, box
+
 
 ################################################################
 
