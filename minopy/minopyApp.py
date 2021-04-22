@@ -18,12 +18,11 @@ import shutil
 import h5py
 import re
 import math
-#import subprocess
 
 import minopy
 import minopy.workflow
 from mintpy.utils import writefile, readfile, utils as ut
-#from minsar.job_submission import JOB_SUBMIT
+
 import mintpy
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
 import minopy.minopy_utilities as mut
@@ -195,10 +194,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         if self.customTemplateFile:
             cfile = self.customTemplateFile
             # Copy custom template file to inputs directory for backup
-            inputs_dir = os.path.join(self.workDir, 'inputs')
-            if not os.path.isdir(inputs_dir):
-                os.makedirs(inputs_dir)
-                print('create directory:', inputs_dir)
+
+            for backup_dirname in ['inputs', 'pic']:
+                backup_dir = os.path.join(self.workDir, backup_dirname)
+                # create directory
+                os.makedirs(backup_dir, exist_ok=True)
+
             if ut.run_or_skip(out_file=os.path.join(inputs_dir, os.path.basename(cfile)),
                               in_file=cfile,
                               check_readable=False) == 'run':

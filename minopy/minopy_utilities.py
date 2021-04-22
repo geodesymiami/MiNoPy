@@ -1091,7 +1091,6 @@ def transform_patch(stack_obj, box=None, ref_phase=None, unwDatasetName='unwrapP
             tsi = LA.lstsq(A, pha_data[:, mask_all_net], cond=1e-5)[0]
             ts[0:reference_ind, idx_pixel2inv] = tsi[0:reference_ind, :]
             ts[reference_ind + 1::, idx_pixel2inv] = tsi[reference_ind::, :]
-            
     ts = ts.reshape(num_date, num_row, num_col)
 
     return ts, num_inv_ifg, box
