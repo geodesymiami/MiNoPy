@@ -1,5 +1,7 @@
 [![Language](https://img.shields.io/badge/python-3.5%2B-blue.svg)](https://www.python.org/)
 
+#### NOTICE: Under development... ####
+
 ## MiNoPy ##
 *MIami NOn linear phase inversion in PYthon*
 
@@ -22,7 +24,6 @@ Everything is followed by defined steps in the `minopyApp.py` and the input is a
 examples:
 
 - minopyApp.py template_file
-- minopyApp.py template_file --submit
 - minopyApp.py template_file --start crop --stop unwrap
 - minopyApp.py template_file --dostep ifgrams
 
