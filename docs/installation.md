@@ -87,4 +87,4 @@ cd snaphu/src; make
 
 
 ### Notes
-Please read notes on PyAPS and PySolid from [GitHub/MintPy](https://github.com/insarlab/MintPy/blob/main/docs/installation.md) 
+Please read notes on [PyAPS](https://github.com/yunjunz/PyAPS) and [PySolid](https://github.com/insarlab/PySolid) from [GitHub/MintPy](https://github.com/insarlab/MintPy/blob/main/docs/installation.md) 
