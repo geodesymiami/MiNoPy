@@ -3,8 +3,6 @@
 #### 1. Set the following environment variables in your source file. It could be ~/.bash_profile file for bash user or ~/.cshrc file for csh/tcsh user.
 
 ```
-unset PYTHONPATH
-
 if [ -z ${PYTHONPATH+x} ]; then export PYTHONPATH=""; fi
 
 ##--------- MintPy ------------------##
