@@ -71,7 +71,7 @@ def main(iargs=None):
     app = minopyTimeSeriesAnalysis(inps.customTemplateFile, inps.workDir, inps)
     app.open()
 
-    if not inps.generate_template or inps.run_flag or inps.write_job:
+    if inps.run_flag or inps.write_job and not inps.generate_template:
         app.create_run_files()
     else:
         if len(inps.run_steps) > 0:
@@ -541,7 +541,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         return
 
     def run(self, steps=STEP_LIST):
-        import subprocess
+        #import subprocess
         for sname in steps:
             if not sname in ['correct_unwrap_error', 'mintpy_corrections']:
                 print('\n\n******************** step - {} ********************'.format(sname))
