@@ -20,7 +20,7 @@ from mintpy.utils import writefile, readfile, utils as ut
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
 from minopy.objects.arg_parser import MinoPyParser
 from minopy.defaults.auto_path import autoPath, PathFind
-from minopy.find_short_baselines import find_baselines
+from minopy.find_short_baselines import find_baselines, plot_baselines
 from minopy.objects.utils import (check_template_auto_value,
                                   log_message, get_latest_template_minopy,
                                   read_initial_info)
@@ -118,7 +118,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             self.text_cmd = ''
 
         self.num_workers = int(self.template['minopy.compute.numWorker'])
-        self.num_nodes = int(self.template['minopy.compute.numNode'])
+        #self.num_nodes = int(self.template['minopy.compute.numNode'])
 
         if not self.inps.generate_template:
             self.date_list, self.num_pixels, self.metadata = read_initial_info(self.workDir, self.templateFile)
@@ -236,7 +236,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         print('Total number of PATCHES: {}'.format(num_patches))
         number_of_nodes = math.ceil(num_patches / self.num_workers)
         print('Number of Nodes: {}'.format(number_of_nodes))
-        num_bursts = self.num_pixels // 40000 // self.num_workers
+        num_bursts = int(self.template['minopy.inversion.patchSize'])**2 // 40000
 
         slc_stack = os.path.join(self.workDir, 'inputs/slcStack.h5')
         if self.write_job:
@@ -284,12 +284,16 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         return
 
     def get_interferogram_pairs(self):
-        ifg_dir_names = {'single_reference': 'single_reference',
-                         'sequential': 'sequential',
-                         'single_reference+sequential': 'single_reference_sequential',
+
+        ifg_dir_names = {'mini_stacks': 'mini_stacks',
+                         'single_reference': 'single_reference',
                          'short_baselines': 'short_baselines'}
 
         ifgram_dir = os.path.join(self.workDir, 'inverted/interferograms')
+        baseline_dir = self.template['minopy.load.baselineDir']
+        if not os.path.exists(baseline_dir):
+            baseline_dir = os.path.join(self.workDir, 'inputs/baselines')
+        short_baseline_ifgs = os.path.join(self.workDir, 'short_baseline_ifgs.txt')
 
         if not self.template['minopy.interferograms.list'] in [None, 'None', 'auto']:
             ifgram_dir = ifgram_dir + '_list'
@@ -306,10 +310,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if self.template['minopy.interferograms.type'] == 'short_baselines' and \
                 self.template['minopy.interferograms.list'] in [None, 'None']:
-            baseline_dir = self.template['minopy.load.baselineDir']
-            if not os.path.exists(baseline_dir):
-                baseline_dir = os.path.join(self.workDir, 'inputs/baselines')
-            short_baseline_ifgs = os.path.join(self.workDir, 'short_baseline_ifgs.txt')
             if not os.path.exists(short_baseline_ifgs):
                 print('short_baseline_ifgs.txt does not exists in {}, Creating ...'.format(self.workDir))
                 scp_args = ' -b {} -o {} --date_list {}'.format(baseline_dir, short_baseline_ifgs, self.date_list_text)
@@ -320,21 +320,47 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             self.template['minopy.interferograms.list'] = short_baseline_ifgs
 
         pairs = []
+        ind1 = []
+        ind2 = []
+
         if not self.template['minopy.interferograms.list'] in [None, 'None']:
             with open(self.template['minopy.interferograms.list'], 'r') as f:
                 lines = f.readlines()
             for line in lines:
                 pairs.append((line.split('_')[0], line.split('\n')[0].split('_')[1]))
         else:
-            if 'single_reference' in self.template['minopy.interferograms.type']:
+            if self.template['minopy.interferograms.type'] == 'single_reference':
                 indx = self.date_list.index(reference_date)
                 for i in range(0, len(self.date_list)):
                     if not indx == i:
+                        ind1.append(index)
+                        ind2.append(i)
                         pairs.append((self.date_list[indx], self.date_list[i]))
-            if 'sequential' in self.template['minopy.interferograms.type']:
-                for i in range(0, len(self.date_list)):
-                    if not i == 0:
-                        pairs.append((self.date_list[i - 1], self.date_list[i]))
+            #if 'sequential' in self.template['minopy.interferograms.type']:
+            #    for i in range(0, len(self.date_list)):
+            #        if not i == 0:
+            #            ind1.append(i-1)
+            #            ind2.append(i)
+            #            pairs.append((self.date_list[i - 1], self.date_list[i]))
+
+            if self.template['minopy.interferograms.type'] == 'mini_stacks':
+                mini_stack_default_size = 10
+                total_num_mini_stacks = self.num_images // mini_stack_default_size
+
+                for i in range(total_num_mini_stacks):
+                    indx_ref = i * mini_stack_default_size
+                    last_ind = indx_ref + mini_stack_default_size + 1
+                    indx_ref_0 = indx_ref
+                    #indx_ref_0 = (last_ind - indx_ref) // 2 + indx_ref
+                    if last_ind > self.num_images:
+                        last_ind = self.num_images
+                    for t in range(indx_ref, last_ind):
+                        if t != indx_ref_0:
+                            ind1.append(indx_ref_0)
+                            ind2.append(t)
+                            pairs.append((self.date_list[indx_ref], self.date_list[t]))
+
+            plot_baselines(ind1=ind1, ind2=ind2, dates=self.date_list, baseline_dir=baseline_dir, out_dir=self.workDir)
 
         return ifgram_dir, pairs
 
