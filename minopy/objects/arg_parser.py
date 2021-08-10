@@ -322,6 +322,8 @@ class MinoPyParser:
                            help='Shp statistical test (ks, ad, ttest)')
         patch.add_argument('-p', '--patch_size', type=str, dest='patch_size', default=200,
                            help='Azimuth window size for shp finding')
+        patch.add_argument('-ms', '--mini_stack_size', type=int, dest='ministack_size', default=10,
+                           help='Number of images in each mini stack')
         patch.add_argument('-s', '--slc_stack', type=str, dest='slc_stack', help='SLC stack file')
         patch.add_argument('-n', '--num_worker', dest='num_worker', type=int, default=1,
                            help='Number of parallel tasks (default: 1)')
