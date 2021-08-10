@@ -39,6 +39,7 @@ def main(iargs=None):
         string = dateStr + " * " + msg
         print(string)
 
+
     unwObj = Snaphu(inps)
     do_tiles, metadata = unwObj.need_to_split_tiles()
 
@@ -58,6 +59,7 @@ def main(iargs=None):
         print('3')
         runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata)
 
+    update_connect_component_mask(inps.unwrapped_ifg, inps.input_cor)
 
     print('Time spent: {} m'.format((time.time() - time0)/60))
     return
@@ -259,6 +261,36 @@ def runUnwrap(infile, outfile, corfile, config):
         connImage.renderHdr()
         connImage.renderVRT()
     #   connImage.finalizeImage()
+
+    return
+
+
+def update_connect_component_mask(unwrapped_file, temporal_coherence):
+    from osgeo import gdal
+
+    ds_unw = gdal.Open(unwrapped_file + '.vrt', gdal.GA_ReadOnly)
+    phas = ds_unw.GetRasterBand(2).ReadAsArray()
+
+    ds_conn = gdal.Open(unwrapped_file + '.conncomp.vrt', gdal.GA_ReadOnly)
+    conn_comp = ds_conn.GetRasterBand(1).ReadAsArray()
+
+    factor_2pi = np.round(phas / (2 * np.pi)).astype(np.int) + conn_comp
+    factor_2pi = factor_2pi - np.min(factor_2pi) + 1
+    mask = conn_comp > 0
+
+    if not temporal_coherence is None:
+        ds_tcoh = gdal.Open(temporal_coherence.split('_msk')[0] + '.vrt', gdal.GA_ReadOnly)
+        tcoh = ds_tcoh.GetRasterBand(1).ReadAsArray()
+        mask2 = tcoh > 0.5
+        mask *= mask2
+
+    new_conn_comp = factor_2pi * mask
+    length = new_conn_comp.shape[0]
+    width = new_conn_comp.shape[1]
+    out_connComp = np.memmap(unwrapped_file + '.conncomp', dtype=np.byte, mode='write', shape=(length, width))
+    out_connComp[:, :] = new_conn_comp[:, :]
+
+    del out_connComp
 
     return
 
