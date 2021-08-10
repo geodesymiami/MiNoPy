@@ -6,7 +6,6 @@ import numpy as np
 import argparse
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree
-#import matplotlib.pyplot as plt
 
 def cmd_line_parse(iargs=None):
     parser = argparse.ArgumentParser(description='find the minimum number of connected good interferograms')
@@ -93,24 +92,55 @@ def find_baselines(iargs=None):
                 q[i, :] = 0
         A = np.triu(q)
 
-    
     ind1, ind2 = np.where(A > 0)
-    intdates = ['{}_{}\n'.format(dates[g], dates[h]) for g, h in zip(ind1, ind2)]
-    intdates_test = ['{}_{}, {}, {}, {}\n'.format(dates[g], dates[h], str(baselines[g]),
-                                             str(baselines[h]), str(baselines[g] - baselines[h]))
-                for g, h in zip(ind1, ind2)]
+    ifgdates = ['{}_{}\n'.format(dates[g], dates[h]) for g, h in zip(ind1, ind2)]
 
     with open(inps.out_file, 'w') as f:
-        f.writelines(intdates)
+        f.writelines(ifgdates)
 
-    plot_baselines(intdates_test, os.path.join(os.path.dirname(inps.out_file)))
+    plot_baselines(ind1=ind1, ind2=ind2, dates=dates, baselines=baselines,
+                   out_dir=os.path.join(os.path.dirname(inps.out_file)))
 
     return
 
 
-def plot_baselines(ifgdates, out_dir):
+def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baseline_dir=None):
     import matplotlib.pyplot as plt
     from datetime import datetime
+    import matplotlib.dates as mdates
+    
+    years = mdates.YearLocator()
+    years_fmt = mdates.DateFormatter('%Y')
+
+    if not baseline_dir is None and baselines is None:
+        bf = os.listdir(baseline_dir)
+        if not bf[0].endswith('txt'):
+            bf2 = ['{}/{}.txt'.format(d, d) for d in bf]
+        else:
+            bf2 = bf
+
+        baselines = {}
+        reference = bf[0].split('_')[0]
+        baselines[reference] = 0
+        dates = [x.split('_')[1].split('.')[0] for x in bf]
+        dates.append(reference)
+
+        for d in bf2:
+            secondary = d.split('.txt')[0].split('_')[-1]
+            with open(os.path.join(baseline_dir, d), 'r') as f:
+                lines = f.readlines()
+                if len(lines) != 0:
+                    if 'Bperp (average):' in lines[1]:
+                        baseline = float(lines[1].split('Bperp (average):')[1])
+                    else:
+                        baseline = float(lines[1].split('PERP_BASELINE_TOP')[1])
+                    #baselines.append(baseline)
+                    baselines[secondary] = baseline
+
+    dates = np.sort(dates)
+    ifgdates = ['{}_{}, {}, {}, {}\n'.format(dates[g], dates[h], str(baselines[dates[g]]),
+                                             str(baselines[dates[h]]), str(baselines[dates[g]] - baselines[dates[h]]))
+                    for g, h in zip(ind1, ind2)]
 
     fig = plt.figure(figsize=(8, 4))
 
@@ -122,7 +152,10 @@ def plot_baselines(ifgdates, out_dir):
         x2 = datetime.strptime(d[1], '%Y%m%d')
         y1 = float(b[0])
         y2 = float(b[1])
-        plt.plot([x1, x2], [y1, y2], '*-')
+        plt.plot([x1, x2], [y1, y2], 'k*-')
+
+    plt.xlabel('Time [years]')
+    plt.ylabel('Perpendicular Baseline [m]')
 
     fig.savefig(out_dir + '/unwrap_network.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
