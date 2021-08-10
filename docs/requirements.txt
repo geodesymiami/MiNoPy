@@ -29,3 +29,11 @@ openmp
 pykdtree
 xarray
 zarr
+# MinSAR dependencies
+git
+natsort
+bokeh
+qt
+boto3
+botocore
+pdbpp
