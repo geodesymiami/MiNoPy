@@ -445,17 +445,6 @@ def check_template_auto_value(templateDict, mintpyTemplateDict=None, auto_file='
         if value == 'auto' and key in templateAutoDict.keys():
             templateDict[key] = templateAutoDict[key]
 
-    # Change yes --> True and no --> False
-    specialValues = {'yes': True,
-                     'True': True,
-                     'no': False,
-                     'False': False,
-                     'none': None,
-                     }
-    for key, value in templateDict.items():
-        if value in specialValues.keys():
-            templateDict[key] = specialValues[value]
-
     common_keys = ['load.autoPath', 'load.processor', 'load.updateMode', 'load.compression']
 
     if not mintpyTemplateDict is None:
@@ -496,6 +485,17 @@ def check_template_auto_value(templateDict, mintpyTemplateDict=None, auto_file='
 
             # Overwrite exsting original template file
             shutil.move(tmp_file, templateFile)
+
+    # Change yes --> True and no --> False
+    specialValues = {'yes': True,
+                     'True': True,
+                     'no': False,
+                     'False': False,
+                     'none': None,
+                     }
+    for key, value in templateDict.items():
+        if value in specialValues.keys():
+            templateDict[key] = specialValues[value]
 
     return templateDict
 
