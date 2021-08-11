@@ -247,13 +247,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         run_commands = []
 
         scp_args = '--work_dir {a0} --range_window {a1} --azimuth_window {a2} --method {a3} --test {a4} ' \
-                   '--patch_size {a5} --num_worker {a6}'.format(a0=self.workDir,
-                                                              a1=self.template['minopy.inversion.rangeWindow'],
-                                                              a2=self.template['minopy.inversion.azimuthWindow'],
-                                                              a3=self.template['minopy.inversion.phaseLinkingMethod'],
-                                                              a4=self.template['minopy.inversion.shpTest'],
-                                                              a5=self.template['minopy.inversion.patchSize'],
-                                                              a6=self.num_workers)
+                   '--patch_size {a5} --num_worker {a6} --mini_stack_size {a7}'.format(
+            a0=self.workDir, a1=self.template['minopy.inversion.rangeWindow'],
+            a2=self.template['minopy.inversion.azimuthWindow'], a3=self.template['minopy.inversion.phaseLinkingMethod'],
+            a4=self.template['minopy.inversion.shpTest'], a5=self.template['minopy.inversion.patchSize'],
+            a6=self.num_workers, a7=self.template['minopy.inversion.ministackSize'])
+
         if self.write_job and number_of_nodes > 1:
             for i in range(number_of_nodes):
                 scp_args1 = scp_args + ' --index {}'.format(i)
@@ -344,12 +343,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             #            pairs.append((self.date_list[i - 1], self.date_list[i]))
 
             if self.template['minopy.interferograms.type'] == 'mini_stacks':
-                mini_stack_default_size = 10
-                total_num_mini_stacks = self.num_images // mini_stack_default_size
+                total_num_mini_stacks = self.num_images // int(self.template['minopy.inversion.ministackSize'])
 
                 for i in range(total_num_mini_stacks):
-                    indx_ref = i * mini_stack_default_size
-                    last_ind = indx_ref + mini_stack_default_size + 1
+                    indx_ref = i * int(self.template['minopy.inversion.ministackSize'])
+                    last_ind = indx_ref + int(self.template['minopy.inversion.ministackSize']) + 1
                     indx_ref_0 = indx_ref
                     #indx_ref_0 = (last_ind - indx_ref) // 2 + indx_ref
                     if last_ind > self.num_images:
