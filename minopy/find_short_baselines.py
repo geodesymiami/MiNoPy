@@ -110,6 +110,7 @@ def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baselin
     import matplotlib.dates as mdates
     
     years = mdates.YearLocator()
+    months = mdates.MonthLocator()
     years_fmt = mdates.DateFormatter('%Y')
 
     if not baseline_dir is None and baselines is None:
@@ -138,6 +139,7 @@ def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baselin
                     baselines[secondary] = baseline
 
     dates = np.sort(dates)
+
     ifgdates = ['{}_{}, {}, {}, {}\n'.format(dates[g], dates[h], str(baselines[dates[g]]),
                                              str(baselines[dates[h]]), str(baselines[dates[g]] - baselines[dates[h]]))
                     for g, h in zip(ind1, ind2)]
@@ -155,12 +157,19 @@ def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baselin
         plt.plot([x1, x2], [y1, y2], 'k*-')
 
     plt.xlabel('Time [years]')
-    plt.ylabel('Perpendicular Baseline [m]')
+    plt.ylabel('Perp Baseline [m]')
+
+    ax = plt.gca()
+    ax.xaxis.set_major_locator(years)
+    ax.xaxis.set_major_formatter(years_fmt)
+    ax.xaxis.set_minor_locator(months)
+    ax.autoscale_view()
 
     fig.savefig(out_dir + '/unwrap_network.png', bbox_inches='tight', dpi=150)
     plt.close(fig)
 
     return
+
 
 if __name__ == '__main__':
     find_baselines()
