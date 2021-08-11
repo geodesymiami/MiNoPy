@@ -59,7 +59,9 @@ def main(iargs=None):
         print('3')
         runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata)
 
-    update_connect_component_mask(inps.unwrapped_ifg, inps.input_cor)
+    # unfiltered_ifg = os.path.join(os.path.dirname(inps.input_ifg), 'fine.int')
+    # remove_filter(unfiltered_ifg, inps.input_ifg, inps.unwrapped_ifg)
+    # update_connect_component_mask(inps.unwrapped_ifg, inps.input_cor)
 
     print('Time spent: {} m'.format((time.time() - time0)/60))
     return
@@ -266,7 +268,6 @@ def runUnwrap(infile, outfile, corfile, config):
 
 
 def update_connect_component_mask(unwrapped_file, temporal_coherence):
-    from osgeo import gdal
 
     ds_unw = gdal.Open(unwrapped_file + '.vrt', gdal.GA_ReadOnly)
     phas = ds_unw.GetRasterBand(2).ReadAsArray()
@@ -291,6 +292,38 @@ def update_connect_component_mask(unwrapped_file, temporal_coherence):
     out_connComp[:, :] = new_conn_comp[:, :]
 
     del out_connComp
+
+    return
+
+
+def remove_filter(intfile, filtfile, unwfile):
+
+    ds_unw = gdal.Open(unwfile + ".vrt", gdal.GA_ReadOnly)
+    unwphas = ds_unw.GetRasterBand(2).ReadAsArray()
+    unwamp = ds_unw.GetRasterBand(1).ReadAsArray()
+    width = ds_unw.RasterXSize
+    length = ds_unw.RasterYSize
+    del ds_unw
+
+    ds_fifg = gdal.Open(filtfile + ".vrt", gdal.GA_ReadOnly)
+    fifgphas = np.angle(ds_fifg.GetRasterBand(1).ReadAsArray())
+    del ds_fifg
+
+    integer_jumps = unwphas - fifgphas
+
+    ds_ifg = gdal.Open(intfile + ".vrt", gdal.GA_ReadOnly)
+    ifgphas = np.angle(ds_ifg.GetRasterBand(1).ReadAsArray())
+    del ds_ifg
+
+    unwphas = integer_jumps + ifgphas
+    del ifgphas, fifgphas
+
+    ifg = np.memmap(unwfile, dtype=np.float32, mode='write', shape=(2, length, width))
+    ifg[0, :, :] = unwamp
+    ifg[1, :, :] = unwphas
+    del ifg
+
+    IML.renderISCEXML(unwfile, bands=2, nyy=length, nxx=width, datatype='float32', scheme='BSQ')
 
     return
 
