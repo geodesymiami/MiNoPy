@@ -52,7 +52,7 @@ cd PichinchaSenDT142
 minopyApp.py PichinchaSenDT142.template --dir ./minopy
 ```
 
-#### Example tutorial in jupyter notebook [nbviewer](https://nbviewer.jupyter.org/github/geodesymiami/MiNoPy/blob/AugModifications/tutorial/minopyApp.ipynb)
+#### Example tutorial in jupyter notebook [nbviewer](https://nbviewer.jupyter.org/github/geodesymiami/MiNoPy/blob/main/tutorial/minopyApp.ipynb)
 
 [Guide for University of Miami HPC users](./HPC_Users.md)
 
