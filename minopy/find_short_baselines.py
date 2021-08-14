@@ -7,6 +7,7 @@ import argparse
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree
 
+
 def cmd_line_parse(iargs=None):
     parser = argparse.ArgumentParser(description='find the minimum number of connected good interferograms')
     parser.add_argument('-b', '--baselineDir', dest='baseline_dir', type=str, help='Baselines directory')
@@ -20,7 +21,6 @@ def cmd_line_parse(iargs=None):
     parser.add_argument('--MinSpanTree', dest='min_span_tree', action='store_true',
                           help='Keep minimum spanning tree pairs')
 
-
     inps = parser.parse_args(args=iargs)
     return inps
 
@@ -28,42 +28,16 @@ def cmd_line_parse(iargs=None):
 def find_baselines(iargs=None):
     inps = cmd_line_parse(iargs)
 
-    bf = os.listdir(inps.baseline_dir)
-    if not bf[0].endswith('txt'):
-        bf2 = ['{}/{}.txt'.format(d, d) for d in bf]
-    else:
-        bf2 = bf
-        
-    baselines = []
-    for d in bf2:
-        with open(os.path.join(inps.baseline_dir, d), 'r') as f:
-            lines = f.readlines()
-            if len(lines) != 0:
-                if 'Bperp (average):' in lines[1]:
-                    baseline = lines[1].split('Bperp (average):')[1]
-                else:
-                    baseline = lines[1].split('PERP_BASELINE_TOP')[1]
-                baselines.append(baseline)
+    baselines, dates = get_baselines_dict(inps.baseline_dir)
+    with open(inps.date_list, 'r') as f:
+        date_list = f.readlines()
+        date_list = [dd.split('\n')[0] for dd in date_list]
 
-    baselines = [float(x.split('\n')[0].strip()) for x in baselines]
-    reference = bf[0].split('_')[0]
-    dates = [x.split('_')[1].split('.')[0] for x in bf]
-    dates.append(reference)
-    baselines.append(0)
-    if not inps.date_list is None:
-        with open(inps.date_list, 'r') as fr:
-            date_list = fr.readlines()
-        date_list = [x.split('\n')[0] for x in date_list]
-        for i, date in enumerate(dates):
-            if date not in date_list:
-                del dates[i]
-                del baselines[i]
+    for i, date in enumerate(dates):
+        if not date in date_list:
+            del dates[i]
 
-    db_tuples = [(x, y) for x, y in zip(dates, baselines)]
-    db_tuples.sort()
-
-    dates = [x[0] for x in db_tuples]
-    baselines = [x[1] for x in db_tuples]
+    dates = np.sort(dates)
 
     q = np.zeros([len(dates), len(dates)])
 
@@ -73,7 +47,7 @@ def find_baselines(iargs=None):
         t = t[t < len(dates)]
         if len(t) > 0:
             for m in range(t[0], t[-1] + 1):
-                q[i, m] = np.abs(baselines[i] - baselines[m])
+                q[i, m] = np.abs(baselines[dates[i]] - baselines[dates[m]])
                 q[m, i] = q[i, m]
 
         #if len(t) > 3:
@@ -99,9 +73,37 @@ def find_baselines(iargs=None):
         f.writelines(ifgdates)
 
     plot_baselines(ind1=ind1, ind2=ind2, dates=dates, baselines=baselines,
-                   out_dir=os.path.join(os.path.dirname(inps.out_file)))
+                   out_dir=os.path.dirname(inps.out_file))
 
     return
+
+
+def get_baselines_dict(baseline_dir):
+
+    bf = os.listdir(baseline_dir)
+    if not bf[0].endswith('txt'):
+        bf2 = ['{}/{}.txt'.format(d, d) for d in bf]
+    else:
+        bf2 = bf
+
+    baselines = {}
+    reference = bf[0].split('_')[0]
+    baselines[reference] = 0
+    dates = [x.split('_')[1].split('.')[0] for x in bf]
+    dates.append(reference)
+
+    for d in bf2:
+        secondary = d.split('.txt')[0].split('_')[-1]
+        with open(os.path.join(baseline_dir, d), 'r') as f:
+            lines = f.readlines()
+            if len(lines) != 0:
+                if 'Bperp (average):' in lines[1]:
+                    baseline = float(lines[1].split('Bperp (average):')[1])
+                else:
+                    baseline = float(lines[1].split('PERP_BASELINE_TOP')[1])
+                # baselines.append(baseline)
+                baselines[secondary] = baseline
+    return baselines, dates
 
 
 def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baseline_dir=None):
@@ -114,29 +116,7 @@ def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baselin
     years_fmt = mdates.DateFormatter('%Y')
 
     if not baseline_dir is None and baselines is None:
-        bf = os.listdir(baseline_dir)
-        if not bf[0].endswith('txt'):
-            bf2 = ['{}/{}.txt'.format(d, d) for d in bf]
-        else:
-            bf2 = bf
-
-        baselines = {}
-        reference = bf[0].split('_')[0]
-        baselines[reference] = 0
-        dates = [x.split('_')[1].split('.')[0] for x in bf]
-        dates.append(reference)
-
-        for d in bf2:
-            secondary = d.split('.txt')[0].split('_')[-1]
-            with open(os.path.join(baseline_dir, d), 'r') as f:
-                lines = f.readlines()
-                if len(lines) != 0:
-                    if 'Bperp (average):' in lines[1]:
-                        baseline = float(lines[1].split('Bperp (average):')[1])
-                    else:
-                        baseline = float(lines[1].split('PERP_BASELINE_TOP')[1])
-                    #baselines.append(baseline)
-                    baselines[secondary] = baseline
+        baselines = get_baselines_dict(baseline_dir)[0]
 
     dates = np.sort(dates)
 
@@ -146,14 +126,14 @@ def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baselin
 
     fig = plt.figure(figsize=(8, 4))
 
-    dates = [x.split(',')[0].split('_') for x in ifgdates]
-    baselines = [x.split('\n')[0].split(',')[1:3] for x in ifgdates]
+    for d in ifgdates:
+        X = d.split(',')[0].split('_')
+        x1 = datetime.strptime(X[0], '%Y%m%d')
+        x2 = datetime.strptime(X[1], '%Y%m%d')
 
-    for d, b in zip(dates, baselines):
-        x1 = datetime.strptime(d[0], '%Y%m%d')
-        x2 = datetime.strptime(d[1], '%Y%m%d')
-        y1 = float(b[0])
-        y2 = float(b[1])
+        Y = d.split('\n')[0].split(',')[1:3]
+        y1 = float(Y[0])
+        y2 = float(Y[1])
         plt.plot([x1, x2], [y1, y2], 'k*-')
 
     plt.xlabel('Time [years]')
