@@ -8,6 +8,16 @@
 
 import os
 import sys
+
+# Disable
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+
+# Restore
+def enablePrint():
+    sys.stdout = sys.__stdout__
+
+blockPrint()
 import multiprocessing
 import isce
 from isceobj.Util.ImageUtil import ImageLib as IML
@@ -17,9 +27,7 @@ from osgeo import gdal
 import subprocess
 import time
 import datetime
-
-CONFIG_FILE = os.path.dirname(os.path.abspath(__file__)) + '/defaults/conf.full'
-
+enablePrint()
 
 def main(iargs=None):
     """
@@ -72,8 +80,8 @@ class Snaphu:
     def __init__(self, inps):
 
         work_dir = os.path.dirname(inps.input_ifg)
-        if os.path.exists(work_dir + '/filt_fine.unw.conncomp.vrt'):
-            sys.exit(1)
+        #if os.path.exists(work_dir + '/filt_fine.unw.conncomp.vrt'):
+        #    sys.exit(1)
         self.config_file = os.path.join(work_dir, 'config_all')
         LENGTH = inps.ref_length
         WIDTH = inps.ref_width
@@ -94,6 +102,9 @@ class Snaphu:
                          'azlooks': azlooks,
                          'rglooks': rglooks}
 
+        CONFIG_FILE = os.path.dirname(os.path.dirname(inps.input_cor)) + '/conf.full'
+        if not os.path.exists(CONFIG_FILE):
+            CONFIG_FILE = os.path.dirname(os.path.abspath(__file__)) + '/defaults/conf.full'
 
         with open(CONFIG_FILE, 'r') as f:
             self.config_default = f.readlines()
