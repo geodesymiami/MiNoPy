@@ -400,6 +400,8 @@ class MinoPyParser:
                             help='Maximum abrupt phase discontinuity (cycles)')
         parser.add_argument('-nt', '--num_tiles', dest='num_tiles', type=int, default=1,
                             help='Number of tiles for Unwrapping in parallel')
+        parser.add_argument('--rmfilter', dest='remove_filter_flag', action='store_true',
+                            help='Remove filtering after unwrap')
 
         return parser
 
