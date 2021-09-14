@@ -548,7 +548,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         run_file_phase_to_range = os.path.join(self.run_dir, RUN_FILES[sname])
         print('Generate {}'.format(run_file_phase_to_range))
 
-        run_commands = ['{} phase_to_range.py --work_dir {}\n'.format(self.text_cmd.strip("'"), self.workDir)]
+        run_commands = ['{} phase_to_range.py --work_dir {} --num_worker {}\n'.format(self.text_cmd.strip("'"),
+                                                                                      self.workDir,
+                                                                                      self.template['minopy.compute.numWorker'])]
         run_commands = run_commands[0].lstrip()
         os.makedirs(self.run_dir, exist_ok=True)
 
