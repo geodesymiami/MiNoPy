@@ -10,7 +10,7 @@ import numpy as np
 from minopy.objects.arg_parser import MinoPyParser
 from mintpy.objects import ifgramStack, cluster
 from mintpy.utils import writefile, readfile, utils as ut
-from mintpy.ifgram_inversion import split2boxes, ifgram_inversion_patch
+from mintpy.ifgram_inversion import split2boxes, ifgram_inversion_patch, get_design_matrix4std
 import h5py
 from mintpy import generate_mask
 
@@ -237,6 +237,13 @@ def main(iargs=None):
     }
     writefile.layout_hdf5(inps.tsFile, ds_name_dict, metadata)
 
+    ref_date4std = get_design_matrix4std(stack_obj)[2]
+    fbase = os.path.splitext(inps.tsFile)[0]
+    fbase += 'Decor'
+    tsStdFile = f'{fbase}Std.h5'
+    metadata['REF_DATE'] = ref_date4std
+    writefile.layout_hdf5(tsStdFile, ds_name_dict, metadata)
+
     # 2.3 instantiate invQualifyFile: temporalCoherence / residualInv
     if 'residual' in os.path.basename(inps.invQualityFile).lower():
         inv_quality_name = 'residual'
@@ -270,7 +277,8 @@ def main(iargs=None):
         "water_mask_file": inps.waterMaskFile,
         "mask_ds_name": inps.maskDataset,
         "mask_threshold": inps.maskThreshold,
-        "min_redundancy": inps.minRedundancy
+        "min_redundancy": inps.minRedundancy,
+        "calc_std": True
     }
 
     # 3.3 invert / write block-by-block
@@ -284,10 +292,9 @@ def main(iargs=None):
 
         # update box argument in the input data
         data_kwargs['box'] = box
-        num_workers = int(metadata['minopy.compute.numWorker'])
-        if num_workers == 1:
+        if inps.num_worker == 1:
             # non-parallel
-            ts, inv_quality, num_inv_ifg = ifgram_inversion_patch(**data_kwargs)[:-1]
+            ts, ts_std, inv_quality, num_inv_ifg = ifgram_inversion_patch(**data_kwargs)[:-1]
 
         else:
             # parallel
@@ -297,15 +304,16 @@ def main(iargs=None):
             ts = np.zeros((num_date, box_len, box_wid), np.float32)
             inv_quality = np.zeros((box_len, box_wid), np.float32)
             num_inv_ifg = np.zeros((box_len, box_wid), np.float32)
+            ts_std = np.zeros((num_date, box_len, box_wid), np.float32)
 
             # initiate dask cluster and client
-            cluster_obj = cluster.DaskCluster('local', num_workers)
+            cluster_obj = cluster.DaskCluster('local', inps.num_worker)
             cluster_obj.open()
 
             # run dask
-            ts, inv_quality, num_inv_ifg = cluster_obj.run(func=ifgram_inversion_patch,
+            ts, ts_std, inv_quality, num_inv_ifg = cluster_obj.run(func=ifgram_inversion_patch,
                                                            func_data=data_kwargs,
-                                                           results=[ts, inv_quality, num_inv_ifg])
+                                                           results=[ts, ts_std, inv_quality, num_inv_ifg])
 
             # close dask cluster and client
             cluster_obj.close()
@@ -319,6 +327,11 @@ def main(iargs=None):
         block = [0, num_date, box[1], box[3], box[0], box[2]]
         writefile.write_hdf5_block(inps.tsFile,
                                    data=ts,
+                                   datasetName='timeseries',
+                                   block=block)
+
+        writefile.write_hdf5_block(tsStdFile,
+                                   data=ts_std,
                                    datasetName='timeseries',
                                    block=block)
 
