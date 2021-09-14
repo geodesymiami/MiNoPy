@@ -10,7 +10,7 @@ import numpy as np
 from minopy.objects.arg_parser import MinoPyParser
 from mintpy.objects import ifgramStack, cluster
 from mintpy.utils import writefile, readfile, utils as ut
-from mintpy.ifgram_inversion import split2boxes, ifgram_inversion_patch, get_design_matrix4std
+from mintpy.ifgram_inversion import split2boxes, ifgram_inversion_patch
 import h5py
 from mintpy import generate_mask
 
@@ -237,12 +237,10 @@ def main(iargs=None):
     }
     writefile.layout_hdf5(inps.tsFile, ds_name_dict, metadata)
 
-    ref_date4std = get_design_matrix4std(stack_obj)[2]
-    fbase = os.path.splitext(inps.tsFile)[0]
-    fbase += 'Decor'
-    tsStdFile = f'{fbase}Std.h5'
-    metadata['REF_DATE'] = ref_date4std
-    writefile.layout_hdf5(tsStdFile, ds_name_dict, metadata)
+    #fbase = os.path.splitext(inps.tsFile)[0]
+    #fbase += 'Decor'
+    #tsStdFile = f'{fbase}Std.h5'
+    #writefile.layout_hdf5(tsStdFile, ds_name_dict, metadata)
 
     # 2.3 instantiate invQualifyFile: temporalCoherence / residualInv
     if 'residual' in os.path.basename(inps.invQualityFile).lower():
@@ -278,7 +276,7 @@ def main(iargs=None):
         "mask_ds_name": inps.maskDataset,
         "mask_threshold": inps.maskThreshold,
         "min_redundancy": inps.minRedundancy,
-        "calc_std": True
+        "calc_std": False
     }
 
     # 3.3 invert / write block-by-block
@@ -312,8 +310,8 @@ def main(iargs=None):
 
             # run dask
             ts, ts_std, inv_quality, num_inv_ifg = cluster_obj.run(func=ifgram_inversion_patch,
-                                                           func_data=data_kwargs,
-                                                           results=[ts, ts_std, inv_quality, num_inv_ifg])
+                                                                   func_data=data_kwargs,
+                                                                   results=[ts, ts_std, inv_quality, num_inv_ifg])
 
             # close dask cluster and client
             cluster_obj.close()
@@ -330,10 +328,10 @@ def main(iargs=None):
                                    datasetName='timeseries',
                                    block=block)
 
-        writefile.write_hdf5_block(tsStdFile,
-                                   data=ts_std,
-                                   datasetName='timeseries',
-                                   block=block)
+        #writefile.write_hdf5_block(tsStdFile,
+        #                           data=ts_std,
+        #                           datasetName='timeseries',
+        #                           block=block)
 
         # temporal coherence - 2D
         block = [box[1], box[3], box[0], box[2]]
