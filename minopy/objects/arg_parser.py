@@ -410,6 +410,8 @@ class MinoPyParser:
         parser = argparse.ArgumentParser(description='Convert phase to range time series')
         parser.add_argument('-d', '--work_dir', type=str, dest='work_dir', required=True,
                             help='Working directory (minopy)')
+        parser.add_argument('-n', '--num_worker', dest='num_worker', type=int, default=1,
+                           help='Number of parallel tasks (default: 1)')
         return parser
 
     @staticmethod
