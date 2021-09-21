@@ -79,8 +79,8 @@ class Snaphu:
     def __init__(self, inps):
 
         work_dir = os.path.dirname(inps.input_ifg)
-        #if os.path.exists(work_dir + '/filt_fine.unw.conncomp.vrt'):
-        #    sys.exit(1)
+        if os.path.exists(work_dir + '/filt_fine.unw.conncomp.vrt'):
+            sys.exit(1)
         self.config_file = os.path.join(work_dir, 'config_all')
         LENGTH = inps.ref_length
         WIDTH = inps.ref_width
