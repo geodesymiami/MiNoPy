@@ -193,6 +193,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             inps.work_dir = self.run_dir
             inps.out_dir = self.run_dir
             inps.num_data = self.num_images
+            inps.tmp = True
             job_obj = JOB_SUBMIT(inps)
         else:
             job_obj = None
@@ -374,8 +375,10 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             sensor_type = 'tops'
 
         #  command for generating unwrap mask
-        cmd_generate_unwrap_mask = '{} generate_unwrap_mask.py --geometry {} '.format(
-            self.text_cmd.strip("'"), os.path.join(self.workDir, 'inputs/geometryRadar.h5'))
+        cmd_generate_unwrap_mask = '{} generate_unwrap_mask.py --geometry {} --quality_type {} '.format(
+            self.text_cmd.strip("'"), os.path.join(self.workDir, 'inputs/geometryRadar.h5'),
+            self.template['minopy.timeseries.tempCohType'])
+
         if not self.template['minopy.unwrap.mask'] in ['None', None]:
             cmd_generate_unwrap_mask += '--mask {}'.format(self.template['minopy.unwrap.mask'])
         cmd_generate_unwrap_mask = cmd_generate_unwrap_mask.lstrip() + '\n'
@@ -450,7 +453,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         num_lin = 0
 
-        corr_file = os.path.join(self.workDir, 'inverted/quality')
+        corr_file = os.path.join(self.workDir, 'inverted/quality_{}'.format(self.template['minopy.timeseries.tempCohType']))
         unwrap_mask = os.path.join(self.workDir, 'inverted/mask_unwrap')
 
         for pair in self.pairs:
@@ -469,7 +472,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                              a5=self.template['minopy.unwrap.initMethod'],
                                                              a6=length, a7=width, a8=height, a9=ntiles,
                                                              a10=earth_radius, a11=wavelength, a12=unwrap_mask)
-            if float(self.template['minopy.interferograms.filterStrength']) > 0:
+            if float(self.template['minopy.interferograms.filterStrength']) > 0 and self.template['minopy.unwrap.removeFilter']:
                 scp_args += ' --rmfilter'
             cmd = '{} unwrap_ifgram.py {}'.format(self.text_cmd.strip("'"), scp_args)
             cmd = cmd.lstrip()
