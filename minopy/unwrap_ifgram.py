@@ -48,13 +48,13 @@ def main(iargs=None):
         string = dateStr + " * " + msg
         print(string)
 
+    time0 = time.time()
+
     inps.work_dir = os.path.dirname(inps.input_ifg)
     if not os.path.exists(inps.work_dir + '/filt_fine.unw.conncomp.vrt'):
 
         unwObj = Snaphu(inps)
         do_tiles, metadata = unwObj.need_to_split_tiles()
-
-        time0 = time.time()
 
         try:
             if do_tiles:
@@ -73,7 +73,6 @@ def main(iargs=None):
         remove_filter(input_ifg_nofilter, inps.input_ifg, inps.unwrapped_ifg)
 
     print('Time spent: {} m'.format((time.time() - time0)/60))
-    
 
     return
 
