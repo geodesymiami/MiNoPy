@@ -199,12 +199,13 @@ cdef class CPhaseLink:
                 RSLC['shp'][:, :] = 1
 
                 RSLC.create_dataset('quality',
-                                    shape=(self.length, self.width),
-                                    maxshape=(self.length, self.width),
+                                    shape=(2, self.length, self.width),
+                                    maxshape=(2, self.length, self.width),
                                     chunks=True,
                                     dtype=np.float32)
 
-                RSLC['quality'][:, :] = -1
+                RSLC['quality'][:, :, :] = -1
+
 
                 # 1D dataset containing dates of all images
                 data = np.array(self.all_date_list, dtype=np.string_)
@@ -280,7 +281,7 @@ cdef class CPhaseLink:
         cdef cnp.ndarray[int, ndim=1] box
         cdef bytes patch_dir
         cdef float complex[:, :, ::1] rslc_ref
-        cdef float[:, ::1] quality
+        cdef float[:, :, ::1] quality
 
         if os.path.exists(self.RSLCfile.decode('UTF-8')):
             print('Deleting old phase_series.h5 ...')
@@ -316,28 +317,28 @@ cdef class CPhaseLink:
                 write_hdf5_block_2D_int(fhandle, shp, b'shp', block)
 
                 # temporal coherence - 2D
-                block = [box[1], box[3], box[0], box[2]]
-                write_hdf5_block_2D_float(fhandle, quality, b'quality', block)
+                block = [0, 2, box[1], box[3], box[0], box[2]]
+                write_hdf5_block_3D(fhandle, quality, b'quality', block)
 
 
             print('write shp file')
             shp_file = self.work_dir + b'/shp'
 
             if not os.path.exists(shp_file.decode('UTF-8')):
-                shp_memmap = np.memmap(shp_file.decode('UTF-8'), mode='write', dtype='int',
+                shp_memmap = np.memmap(shp_file.decode('UTF-8'), mode='write', dtype='int16',
                                            shape=(self.length, self.width))
                 IML.renderISCEXML(shp_file.decode('UTF-8'), bands=1, nyy=self.length, nxx=self.width,
-                                  datatype='int32', scheme='BIL')
+                                  datatype='int16', scheme='BIL')
             else:
-                shp_memmap = np.memmap(shp_file.decode('UTF-8'), mode='r+', dtype='int',
+                shp_memmap = np.memmap(shp_file.decode('UTF-8'), mode='r+', dtype='int16',
                                            shape=(self.length, self.width))
 
             shp_memmap[:, :] = fhandle['shp']
             shp_memmap = None
 
 
-            print('write quality file')
-            quality_file = self.out_dir + b'/quality'
+            print('write averaged quality file from mini stacks')
+            quality_file = self.out_dir + b'/quality_average'
 
             if not os.path.exists(quality_file.decode('UTF-8')):
                 quality_memmap = np.memmap(quality_file.decode('UTF-8'), mode='write', dtype='float32',
@@ -348,7 +349,22 @@ cdef class CPhaseLink:
                 quality_memmap = np.memmap(quality_file.decode('UTF-8'), mode='r+', dtype='float32',
                                            shape=(self.length, self.width))
 
-            quality_memmap[:, :] = fhandle['quality']
+            quality_memmap[:, :] = fhandle['quality'][0, :, :]
+            quality_memmap = None
+
+            print('write quality file from full stack')
+            quality_file = self.out_dir + b'/quality_full'
+
+            if not os.path.exists(quality_file.decode('UTF-8')):
+                quality_memmap = np.memmap(quality_file.decode('UTF-8'), mode='write', dtype='float32',
+                                           shape=(self.length, self.width))
+                IML.renderISCEXML(quality_file.decode('UTF-8'), bands=1, nyy=self.length, nxx=self.width,
+                                  datatype='float32', scheme='BIL')
+            else:
+                quality_memmap = np.memmap(quality_file.decode('UTF-8'), mode='r+', dtype='float32',
+                                           shape=(self.length, self.width))
+
+            quality_memmap[:, :] = fhandle['quality'][1, :, :]
             quality_memmap = None
 
             print('close HDF5 file phase_series.h5.')
