@@ -153,7 +153,8 @@ def main(iargs=None):
     length, width = stack_obj.length, stack_obj.width
 
     # 1.0 read minopy quality
-    quality_name = os.path.join(inps.work_dir, 'inverted/quality_msk')
+    quality_name = os.path.join(inps.work_dir,
+                                'inverted/quality_{}_msk'.format(metadata['minopy.timeseries.tempCohType']))
     quality = np.memmap(quality_name, mode='r', dtype='float32', shape=(length, width))
 
     with h5py.File(os.path.join(inps.work_dir, 'avgSpatialCoh.h5'), 'r') as dsa:
