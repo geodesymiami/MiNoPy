@@ -51,7 +51,7 @@ def main(iargs=None):
             print('Mask {} does not exist!!!!!!  skip'.format(inps.custom_mask))
             h5_mask = shadow_mask
 
-    corr_file = os.path.join(minopy_dir, 'inverted/quality')
+    corr_file = os.path.join(minopy_dir, 'inverted/quality_{}'.format(inps.quality_type))
     mask_arg = ' {} -m {} --fill 0 -o {}'.format(corr_file,
                                                  h5_mask,
                                                  corr_file + '_msk')
