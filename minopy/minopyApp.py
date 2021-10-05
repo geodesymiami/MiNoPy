@@ -92,9 +92,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         self.inps = inps
         self.write_job = inps.write_job
         self.run_flag = inps.run_flag
-        self.copy_temp = False
-        if 'copy_tmp' in inps:
-            self.copy_temp = inps.copy_temp
+        self.copy_to_tmp = False
+        if 'copy_to_tmp' in inps:
+            self.copy_to_tmp = inps.copy_to_tmp
 
     def open(self):
         super().open()
@@ -251,7 +251,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         num_bursts = int(self.template['minopy.inversion.patchSize'])**2 // 40000
 
         slc_stack = os.path.join(self.workDir, 'inputs/slcStack.h5')
-        if self.copy_temp:
+        if self.copy_to_tmp:
             tmp_slc_stack = '/tmp/slcStack.h5'
         else:
             tmp_slc_stack = slc_stack
@@ -284,9 +284,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if self.write_job or not job_obj is None:
             job_obj.num_bursts = num_bursts
-            if self.copy_temp:
+            if self.copy_to_tmp:
                 job_obj.write_batch_jobs(batch_file=run_inversion, num_cores_per_task=self.num_workers,
-                                         distribute=distribute_file)
+                                         distribute=slc_stack)
             else:
                 job_obj.write_batch_jobs(batch_file=run_inversion, num_cores_per_task=self.num_workers)
 
@@ -394,7 +394,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         run_commands.append(cmd_generate_unwrap_mask)
 
         phase_series = os.path.join(self.workDir, 'inverted/phase_series.h5')
-        if self.copy_temp:
+        if self.copy_to_tmp:
             tmp_phase_series = '/tmp/phase_series.h5'
         else:
             tmp_phase_series = phase_series
@@ -435,7 +435,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if self.write_job or not job_obj is None:
             job_obj.num_bursts = self.num_pixels // 30000000
-            if self.copy_temp:
+            if self.copy_to_tmp:
                 job_obj.write_batch_jobs(batch_file=run_ifgs, distribute=phase_series)
             else:
                 job_obj.write_batch_jobs(batch_file=run_ifgs)
@@ -484,7 +484,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                              a10=earth_radius, a11=wavelength, a12=unwrap_mask)
             if float(self.template['minopy.interferograms.filterStrength']) > 0 and self.template['minopy.unwrap.removeFilter']:
                 scp_args += ' --rmfilter'
-            if self.copy_temp:
+            if self.copy_to_tmp:
                 scp_args += ' --tmp'
             cmd = '{} unwrap_ifgram.py {}'.format(self.text_cmd.strip("'"), scp_args)
             cmd = cmd.lstrip()

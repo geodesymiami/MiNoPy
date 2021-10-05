@@ -117,7 +117,7 @@ class Snaphu:
         self.config_default.append('LAMBDA   {}\n'.format(inps.wavelength))
         self.config_default.append('EARTHRADIUS   {}\n'.format(inps.earth_radius))
         self.config_default.append('INITMETHOD   {}\n'.format(inps.init_method))
-        if inps.copy_tmp:
+        if inps.copy_to_tmp:
             os.system('rm -rf /tmp/{}'.format(os.path.basename(inps.work_dir)))
             self.config_default.append('TILEDIR   /tmp/{}\n'.format(os.path.basename(inps.work_dir)))
         if not inps.unwrap_mask is None:

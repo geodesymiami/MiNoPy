@@ -404,7 +404,7 @@ class MinoPyParser:
                             help='Number of tiles for Unwrapping in parallel')
         parser.add_argument('--rmfilter', dest='remove_filter_flag', action='store_true',
                             help='Remove filtering after unwrap')
-        parser.add_argument('--tmp', dest='copy_temp', action='store_true', help='Copy and process on tmp')
+        parser.add_argument('--tmp', dest='copy_to_tmp', action='store_true', help='Copy and process on tmp')
 
         return parser
 
@@ -471,7 +471,7 @@ class MinoPyParser:
         parser.add_argument('--jobfiles', dest='write_job', action='store_true',
                           help='Do not run the tasks, only write job files')
         parser.add_argument('--runfiles', dest='run_flag', action='store_true', help='Create run files for all steps')
-        parser.add_argument('--tmp', dest='copy_temp', action='store_true', help='Copy and process on tmp')
+        parser.add_argument('--tmp', dest='copy_to_tmp', action='store_true', help='Copy and process on tmp')
 
         step = parser.add_argument_group('steps processing (start/end/dostep)', STEP_HELP)
         step.add_argument('--start', dest='startStep', metavar='STEP', default=STEP_LIST[0],
