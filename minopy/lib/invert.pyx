@@ -296,6 +296,7 @@ cdef class CPhaseLink:
         print('open  HDF5 file phase_series.h5 in a mode')
 
         with h5py.File(self.RSLCfile.decode('UTF-8'), 'a') as fhandle:
+            
             for index, box in enumerate(self.box_list):
                 patch_dir = self.out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
                 rslc_ref = np.load(patch_dir.decode('UTF-8') + '/phase_ref.npy')
@@ -320,7 +321,7 @@ cdef class CPhaseLink:
                 block = [0, 2, box[1], box[3], box[0], box[2]]
                 write_hdf5_block_3D(fhandle, quality, b'quality', block)
 
-
+            
             print('write shp file')
             shp_file = self.work_dir + b'/shp'
 
@@ -333,7 +334,7 @@ cdef class CPhaseLink:
                 shp_memmap = np.memmap(shp_file.decode('UTF-8'), mode='r+', dtype='int16',
                                            shape=(self.length, self.width))
 
-            shp_memmap[:, :] = fhandle['shp']
+            shp_memmap[:, :] = fhandle['shp'][:, :]
             shp_memmap = None
 
 
