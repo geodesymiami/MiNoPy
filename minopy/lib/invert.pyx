@@ -74,6 +74,8 @@ cdef class CPhaseLink:
         self.slcStackObj = slcStack(inps.slc_stack)
         self.metadata = self.slcStackObj.get_metadata()
         self.all_date_list = self.slcStackObj.get_date_list()
+        with h5py.File(inps.slc_stack, 'r') as f:
+            self.prep_baselines = f['bperp'][:]
         self.n_image, self.length, self.width = self.slcStackObj.get_size()
         self.time_lag = inps.time_lag
 
@@ -210,6 +212,10 @@ cdef class CPhaseLink:
                 # 1D dataset containing dates of all images
                 data = np.array(self.all_date_list, dtype=np.string_)
                 RSLC.create_dataset('date', data=data)
+
+                # 1D dataset containing perpendicular baselines of all images
+                data = np.array(self.prep_baselines, dtype=np.float32)
+                RSLC.create_dataset('bperp', data=data)
 
         mask_ps_file = self.work_dir + b'/maskPS.h5'
 

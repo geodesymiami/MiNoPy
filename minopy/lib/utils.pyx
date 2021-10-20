@@ -427,7 +427,7 @@ cdef float test_PS_cy(float complex[:, ::1] coh_mat, float[::1] amplitude):
     #cdef float complex[::1] vec = np.zeros(n, dtype=np.complex64)
     cdef float s, temp_quality, amp_dispersion, amp_diff_dispersion
     #cdef float complex x0
-
+    
     #amplitude_diff = np.zeros(n, dtype=np.float32)
 
     Eigen_value, Eigen_vector = lap.cheevx(coh_mat)[0:2]
@@ -435,10 +435,10 @@ cdef float test_PS_cy(float complex[:, ::1] coh_mat, float[::1] amplitude):
     s = 0
     for i in range(n):
         s += abs(Eigen_value[i])**2
-    #    amplitude_diff[i] = amplitude[i]-amplitude[0]
+        # amplitude_diff[i] = amplitude[i]-amplitude[0]
 
     s = sqrt(s)
-    #amp_diff_dispersion = np.std(amplitude_diff)/np.mean(amplitude)
+    # amp_diff_dispersion = np.std(amplitude_diff)/np.mean(amplitude)
     amp_dispersion = np.std(amplitude)/np.mean(amplitude)
 
     #if Eigen_value[n-1]*(100 / s) > 25 and amp_diff_dispersion <= 0.6:
@@ -1003,6 +1003,7 @@ cdef inline float[::1] mean_along_axis_x(float[:, ::1] x):
         out[i] = temp/x.shape[1]
     return out
 
+
 cdef inline float gam_pta_c(float[:, ::1] ph_filt, float complex[::1] vec):
     """ Returns squeesar PTA coherence between the initial and estimated phase vectors.
     :param ph_filt: np.angle(coh) before inversion
@@ -1013,6 +1014,7 @@ cdef inline float gam_pta_c(float[:, ::1] ph_filt, float complex[::1] vec):
     cdef float[::1] ang_vec = angmat(vec)
     cdef float temp_coh 
     cdef float complex temp = 0
+
     for i in range(n):
         for k in range(i + 1, n):
             temp += cexpf(1j * (ph_filt[i,k] - (ang_vec[i] - ang_vec[k])))
@@ -1074,7 +1076,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     cdef float temp_quality, temp_quality_full
     cdef object prog_bar
     cdef bytes out_folder
-    cdef int index = box[4]
+    cdef int ps, index = box[4]
     cdef float time0 = time.time()
     cdef float complex x0
 
@@ -1099,6 +1101,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     prog_bar = ptime.progressBar(maxValue=num_points)
     p = 0
     for i in range(num_points):
+        ps = 0
         data = (coords[i,0], coords[i,1])
         shp = get_shp_row_col_c(data, patch_slc_images, def_sample_rows, def_sample_cols, azimuth_window,
                                 range_window, reference_row, reference_col, distance_threshold, shp_test)
