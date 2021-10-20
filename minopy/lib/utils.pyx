@@ -428,21 +428,21 @@ cdef float test_PS_cy(float complex[:, ::1] coh_mat, float[::1] amplitude):
     cdef float s, temp_quality, amp_dispersion, amp_diff_dispersion
     #cdef float complex x0
 
-    amplitude_diff = np.zeros(n, dtype=np.float32)
+    #amplitude_diff = np.zeros(n, dtype=np.float32)
 
     Eigen_value, Eigen_vector = lap.cheevx(coh_mat)[0:2]
 
     s = 0
     for i in range(n):
         s += abs(Eigen_value[i])**2
-        amplitude_diff[i] = amplitude[i]-amplitude[0]
+    #    amplitude_diff[i] = amplitude[i]-amplitude[0]
 
     s = sqrt(s)
-    amp_diff_dispersion = np.std(amplitude_diff)/np.mean(amplitude)
-    #amp_dispersion = np.std(amplitude)/np.mean(amplitude)
+    #amp_diff_dispersion = np.std(amplitude_diff)/np.mean(amplitude)
+    amp_dispersion = np.std(amplitude)/np.mean(amplitude)
 
-    if Eigen_value[n-1]*(100 / s) > 25 and amp_diff_dispersion <= 0.6:
-    #if Eigen_value[n-1]*(100 / s) > 25 and amp_dispersion < 0.4:
+    #if Eigen_value[n-1]*(100 / s) > 25 and amp_diff_dispersion <= 0.6:
+    if Eigen_value[n-1]*(100 / s) > 25 and amp_dispersion < 0.4:
         #x0 = cexpf(1j * cargf_r(Eigen_vector[0, n-1]))
         #for i in range(n):
         #    vec[i] = Eigen_vector[i, n-1] * conjf(x0)
@@ -511,8 +511,8 @@ cdef inline tuple regularize_matrix_cy(float[:, ::1] M):
         else:
             for i in range(M.shape[0]):
                 N[i, i] += en
-                en *= 2
-                t += 1
+            en *= 2
+            t += 1
     return status, N
 
 cdef inline tuple phase_linking_process_cy(float complex[:, ::1] ccg_sample, int stepp, bytes method, bint squeez, int lag):
@@ -1079,6 +1079,12 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     cdef float complex x0
 
     out_folder = out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
+
+    #rslc_ref = np.load(out_folder.decode('UTF-8') + '/phase_ref.npy')
+    #SHP = np.load(out_folder.decode('UTF-8') + '/shp.npy')
+    #quality = np.load(out_folder.decode('UTF-8') + '/quality.npy')
+    #mask_ps = np.load(out_folder.decode('UTF-8') + '/mask_ps.npy')
+
     os.makedirs(out_folder.decode('UTF-8'), exist_ok=True)
     if os.path.exists(out_folder.decode('UTF-8') + '/quality.npy'):
         return
@@ -1116,7 +1122,6 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
                 mask_ps[data[0] - row1, data[1] - col1] = 1
 
         else:
-
             if len(phase_linking_method) > 10 and phase_linking_method[0:10] == b'sequential':
                 vec_refined, squeezed_images, temp_quality = sequential_phase_linking_cy(CCG, phase_linking_method,
                                                                            default_mini_stack_size,
@@ -1130,10 +1135,11 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
             else:
                 vec_refined, noval, temp_quality = phase_linking_process_cy(CCG, 0, phase_linking_method, False, lag)
                 #vec_refined, noval = phase_linking_process_cy(CCG, 0, phase_linking_method, False, lag)
-
+            
             amp_refined = mean_along_axis_x(absmat2(CCG))
             temp_quality_full = gam_pta_c(angmat2(coh_mat), vec_refined)
-
+            
+       
         for m in range(n_image):
 
             if m == 0:
@@ -1153,12 +1159,22 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     np.save(out_folder.decode('UTF-8') + '/shp.npy', SHP)
     np.save(out_folder.decode('UTF-8') + '/quality.npy', quality)
     np.save(out_folder.decode('UTF-8') + '/mask_ps.npy', mask_ps)
+    #np.save(out_folder.decode('UTF-8') + '/flag.npy', [1])
 
     print('    Phase inversion of PATCH_{} is Completed in {} s\n'.format(index, time.time()-time0))
 
     return
 
 cdef int ks2smapletest_cy(cnp.ndarray[float, ndim=1] S1, cnp.ndarray[float, ndim=1] S2, float threshold):
+    cdef int res
+    cdef float distance = ecdf_distance(S1, S2)
+    if distance <= threshold:
+        res = 1
+    else:
+        res = 0
+    return res
+
+cpdef int ks2smapletest_py(cnp.ndarray[float, ndim=1] S1, cnp.ndarray[float, ndim=1] S2, float threshold):
     cdef int res
     cdef float distance = ecdf_distance(S1, S2)
     if distance <= threshold:
