@@ -421,9 +421,9 @@ cdef float test_PS_cy(float complex[:, ::1] coh_mat, float[::1] amplitude):
     """ checks if the pixel is PS """
 
     cdef cnp.intp_t i, t, n = coh_mat.shape[0]
-    cdef float[::1] eigen_value
+    cdef float[::1] Eigen_value
     cdef float[::1] amplitude_diff = np.empty(n, dtype=np.float32)
-    cdef cnp.ndarray[float complex, ndim=2] eigen_vector
+    cdef cnp.ndarray[float complex, ndim=2] Eigen_vector
     #cdef float complex[::1] vec = np.zeros(n, dtype=np.complex64)
     cdef float s, temp_quality, amp_dispersion, amp_diff_dispersion
     #cdef float complex x0
@@ -443,15 +443,19 @@ cdef float test_PS_cy(float complex[:, ::1] coh_mat, float[::1] amplitude):
 
     #if Eigen_value[n-1]*(100 / s) > 25 and amp_diff_dispersion <= 0.6:
     if Eigen_value[n-1]*(100 / s) > 25 and amp_dispersion < 0.4:
-        #x0 = cexpf(1j * cargf_r(Eigen_vector[0, n-1]))
-        #for i in range(n):
-        #    vec[i] = Eigen_vector[i, n-1] * conjf(x0)
-
-        temp_quality = 1 #gam_pta_c(angmat2(coh_mat), vec)
+        temp_quality = 1
     else:
         temp_quality = 0
 
-    return temp_quality
+    #elif Eigen_value[n-1]*(100 / s) > 25:
+
+    #    x0 = cexpf(1j * cargf_r(Eigen_vector[0, n-1]))
+    #    for i in range(n):
+    #        vec[i] = Eigen_vector[i, n-1] * conjf(x0)
+
+    #    temp_quality = gam_pta_c(angmat2(coh_mat), vec)
+
+    return temp_quality #, vec
 
 cdef inline float norm_complex(float complex[::1] x):
     cdef cnp.intp_t n = x.shape[0]
@@ -1082,14 +1086,14 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
 
     out_folder = out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
 
+    os.makedirs(out_folder.decode('UTF-8'), exist_ok=True)
+    if os.path.exists(out_folder.decode('UTF-8') + '/quality.npy'):
+        return
+
     #rslc_ref = np.load(out_folder.decode('UTF-8') + '/phase_ref.npy')
     #SHP = np.load(out_folder.decode('UTF-8') + '/shp.npy')
     #quality = np.load(out_folder.decode('UTF-8') + '/quality.npy')
     #mask_ps = np.load(out_folder.decode('UTF-8') + '/mask_ps.npy')
-
-    os.makedirs(out_folder.decode('UTF-8'), exist_ok=True)
-    if os.path.exists(out_folder.decode('UTF-8') + '/quality.npy'):
-        return
 
     for i in range(overlap_length):
         for t in range(overlap_width):
@@ -1118,13 +1122,15 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
             x0 = conjf(patch_slc_images[0, data[0], data[1]])
             for m in range(n_image):
                 vec_refined[m] = patch_slc_images[m, data[0], data[1]]  * x0
-                amp_refined[m] = cabsf(patch_slc_images[m, data[0], data[1]])
+                amp_refined = mean_along_axis_x(absmat2(CCG))
+                #amp_refined[m] = cabsf(patch_slc_images[m, data[0], data[1]])
             temp_quality = test_PS_cy(coh_mat, amp_refined)
             temp_quality_full = temp_quality
             if temp_quality == 1:
                 mask_ps[data[0] - row1, data[1] - col1] = 1
 
         else:
+            
             if len(phase_linking_method) > 10 and phase_linking_method[0:10] == b'sequential':
                 vec_refined, squeezed_images, temp_quality = sequential_phase_linking_cy(CCG, phase_linking_method,
                                                                            default_mini_stack_size,
@@ -1141,7 +1147,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
             
             amp_refined = mean_along_axis_x(absmat2(CCG))
             temp_quality_full = gam_pta_c(angmat2(coh_mat), vec_refined)
-            
+
        
         for m in range(n_image):
 
