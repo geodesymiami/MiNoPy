@@ -458,7 +458,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         run_commands = []
         num_cpu = os.cpu_count()
-        ntiles = self.num_pixels // 4000000
+        ntiles = self.num_pixels // 40000000
         if ntiles == 0:
             ntiles = 1
         num_cpu = num_cpu // ntiles

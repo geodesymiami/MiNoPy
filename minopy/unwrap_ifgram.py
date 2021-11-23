@@ -92,8 +92,8 @@ class Snaphu:
 
         self.length, self.width = self.get_image_size()
 
-        azlooks = int(LENGTH / self.length)
-        rglooks = int(WIDTH / self.width)
+        azlooks = int(np.ceil(LENGTH / self.length))
+        rglooks = int(np.ceil(WIDTH / self.width))
 
         self.metadata = {'defomax': inps.defo_max,
                          'init_method': inps.init_method,
