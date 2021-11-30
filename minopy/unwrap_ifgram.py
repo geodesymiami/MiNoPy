@@ -57,7 +57,6 @@ def main(iargs=None):
         do_tiles, metadata = unwObj.need_to_split_tiles()
 
         #runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata)
-
         try:
             if do_tiles:
                 print('1')
@@ -103,7 +102,7 @@ class Snaphu:
                          'azlooks': azlooks,
                          'rglooks': rglooks}
 
-        CONFIG_FILE = os.path.dirname(os.path.dirname(inps.input_cor)) + '/conf.full'
+        CONFIG_FILE = os.path.dirname(inps.work_dir) + '/../../conf.full'
         if not os.path.exists(CONFIG_FILE):
             CONFIG_FILE = os.path.dirname(os.path.abspath(__file__)) + '/defaults/conf.full'
 
