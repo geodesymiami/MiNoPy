@@ -17,11 +17,12 @@ def enablePrint():
 blockPrint()
 import datetime
 import isceobj
-from isceobj.Image.IntImage import IntImage
 import numpy as np
 from minopy.objects.arg_parser import MinoPyParser
 import h5py
 from math import sqrt, exp
+from scipy.interpolate import griddata
+
 enablePrint()
 
 
@@ -77,6 +78,8 @@ def run_interferogram(inps, resampName):
 
         phase_series = ds['phase']
         amplitudes = ds['amplitude']
+        tempCoh = ds['temporalCoherence'][0, :, :]   # average
+        mask_r, mask_c = np.where(tempCoh >= 0.4)
         length = phase_series.shape[1]
         width = phase_series.shape[2]
 
@@ -90,6 +93,22 @@ def run_interferogram(inps, resampName):
 
         ifg = (ref_amplitude * sec_amplitude) * np.exp(1j * (ref_phase - sec_phase))
 
+
+        z1 = np.real(ifg)[mask_r, mask_c]
+        z2 = np.imag(ifg)[mask_r, mask_c]
+
+        # target grid to interpolate to
+        yi = np.arange(0, length)
+        xi = np.arange(0, width)
+        xi, yi = np.meshgrid(xi, yi)
+
+        zf1 = griddata((mask_r, mask_c), z1, (yi, xi), method='linear')
+        zf2 = griddata((mask_r, mask_c), z2, (yi, xi), method='linear')
+
+        ifg_intp = zf1 + 1j * zf2
+
+        ifg_intp[np.isnan(ifg_intp)] = ifg[np.isnan(ifg_intp)]
+
         intImage = isceobj.createIntImage()
         intImage.setFilename(resampInt)
         intImage.setAccessMode('write')
@@ -98,12 +117,12 @@ def run_interferogram(inps, resampName):
         intImage.createImage()
 
         out_ifg = intImage.asMemMap(resampInt)
-        out_ifg[:, :, 0] = ifg[:, :]
+        out_ifg[:, :, 0] = ifg_intp[:, :]
 
         intImage.renderHdr()
         intImage.finalizeImage()
 
-    return resampName
+    return
 
 def runFilter(infile, outfile, filterStrength):
     from mroipac.filter.Filter import Filter
@@ -123,7 +142,7 @@ def runFilter(infile, outfile, filterStrength):
 
     objFilter = Filter()
     objFilter.wireInputPort(name='interferogram',object=intImage)
-    objFilter.wireOutputPort(name='filtered interferogram',object=filtImage)
+    objFilter.wireOutputPort(name='filtered interferogram', object=filtImage)
     objFilter.goldsteinWerner(alpha=filterStrength)
 
     intImage.finalizeImage()
