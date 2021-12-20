@@ -1053,7 +1053,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     cdef int box_width = box[2] - box[0]
     cdef int box_length = box[3] - box[1]
     cdef cnp.ndarray[float complex, ndim=3] rslc_ref = np.zeros((n_image, box_length, box_width), dtype=np.complex64)
-    cdef cnp.ndarray[float, ndim=3] quality = np.zeros((2, box_length, box_width), dtype=np.float32)
+    cdef cnp.ndarray[float, ndim=3] tempCoh = np.zeros((2, box_length, box_width), dtype=np.float32)
     cdef cnp.ndarray[int, ndim=2] mask_ps = np.zeros((box_length, box_width), dtype=np.int32)
     cdef cnp.ndarray[int, ndim=2] SHP = np.zeros((box_length, box_width), dtype=np.int32)
     cdef int row1 = box[1] - big_box[1]
@@ -1079,6 +1079,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     cdef int ps, index = box[4]
     cdef float time0 = time.time()
     cdef float complex x0
+    cdef float mi, se
 
     out_folder = out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
 
@@ -1152,19 +1153,20 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
             temp_quality = 0
         if temp_quality_full < 0:
             temp_quality_full = 0
-        quality[0, data[0] - row1, data[1] - col1] = temp_quality         # Average temporal coherence from mini stacks
-        quality[1, data[0] - row1, data[1] - col1] = temp_quality_full    # Full stack temporal coherence
+        tempCoh[0, data[0] - row1, data[1] - col1] = temp_quality         # Average temporal coherence from mini stacks
+        tempCoh[1, data[0] - row1, data[1] - col1] = temp_quality_full    # Full stack temporal coherence
         
         prog_bar.update(p + 1, every=500, suffix='{}/{} pixels, patch {}'.format(p + 1, num_points, index))
         p += 1
 
     np.save(out_folder.decode('UTF-8') + '/phase_ref.npy', rslc_ref)
     np.save(out_folder.decode('UTF-8') + '/shp.npy', SHP)
-    np.save(out_folder.decode('UTF-8') + '/quality.npy', quality)
+    np.save(out_folder.decode('UTF-8') + '/tempCoh.npy', tempCoh)
     np.save(out_folder.decode('UTF-8') + '/mask_ps.npy', mask_ps)
     np.save(out_folder.decode('UTF-8') + '/flag.npy', [1])
 
-    print('    Phase inversion of PATCH_{} is Completed in {} s\n'.format(index, time.time()-time0))
+    mi, se = divmod(time.time()-time0, 60)
+    print('    Phase inversion of PATCH_{} is Completed in {:02.0f} mins {:02.1f} secs\n'.format(index, mi, se))
 
     return
 
