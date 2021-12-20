@@ -31,8 +31,6 @@ class MinoPyParser:
 
         if self.script == 'load_slc':
             self.parser = self.load_slc_parser()
-        elif self.script == 'crop_images':
-            self.parser = self.crop_images_parser()
         elif self.script == 'phase_inversion':
             self.parser = self.phase_inversion_parser()
         elif self.script == 'generate_interferograms':
@@ -41,8 +39,10 @@ class MinoPyParser:
             self.parser = self.generate_unwrap_mask_parser()
         elif self.script == 'unwrap_minopy':
             self.parser = self.unwrap_parser()
-        elif self.script == 'phase_to_range':
-            self.parser = self.phase_to_range_parser()
+        elif self.script == 'generate_temporal_coherence':
+            self.parser = self.generate_temporal_coherence_parser()
+        elif self.script == 'network_inversion':
+            self.parser = self.network_inversion_parser()
         elif self.script == 'minopy_app':
             self.parser, self.STEP_LIST, EXAMPLE = self.minopy_app_parser()
 
@@ -82,7 +82,7 @@ class MinoPyParser:
 
         inps.project_dir = os.path.abspath(inps.project_dir)
         inps.PROJECT_NAME = os.path.basename(inps.project_dir)
-        inps.work_dir = os.path.join(inps.project_dir, 'minopy')
+        #inps.work_dir = os.path.join(inps.project_dir, 'minopy')
         os.makedirs(inps.work_dir, exist_ok=True)
         inps.out_dir = os.path.join(inps.work_dir, 'inputs')
         os.makedirs(inps.out_dir, exist_ok=True)
@@ -221,6 +221,8 @@ class MinoPyParser:
         minopy.load.autoPath       = auto    # [yes, no] auto for no
         
         minopy.load.slcFile        = auto  #[path2slc_file]
+        minopy.load.startDate      = auto  #auto for first date
+        minopy.load.endDate        = auto  #auto for last date
         ##---------for ISCE only:
         minopy.load.metaFile       = auto  #[path2metadata_file], i.e.: ./reference/IW1.xml, ./referenceShelve/data.dat
         minopy.load.baselineDir    = auto  #[path2baseline_dir], i.e.: ./baselines
@@ -255,9 +257,11 @@ class MinoPyParser:
         parser.add_argument('-t', '--template', type=str, nargs='+',
                             dest='template_file', help='Template file with path info.')
 
-        parser.add_argument('--project_dir', type=str, dest='project_dir',
+        parser.add_argument('-pj', '--project_dir', type=str, dest='project_dir',
                             help='Project directory of SLC dataset to read from')
-        parser.add_argument('--processor', type=str, dest='processor',
+        parser.add_argument('-d', '--work_dir', type=str, dest='work_dir', default='./minopy',
+                            help='Working directory of minopy (default ./minopy)')
+        parser.add_argument('-pr', '--processor', type=str, dest='processor',
                             choices={'isce', 'gamma', 'roipac'},
                             help='InSAR processor/software of the file (This version only supports isce)',
                             default='isce')
@@ -273,40 +277,6 @@ class MinoPyParser:
                                      'geometryRadar.h5',
                                      'geometryGeo.h5'],
                             help='Output HDF5 file')
-        return parser
-
-    @staticmethod
-    def crop_images_parser():
-
-        TEMPLATE = """template: 
-                ##---------subset (optional):
-                ## if both yx and lalo are specified, use lalo option unless a) no lookup file AND b) dataset is in radar coord
-                mintpy.subset.yx   = auto    #[1800:2000,700:800 / no], auto for no
-                mintpy.subset.lalo = auto    #[31.5:32.5,130.5:131.0 / no], auto for no
-                """
-
-        EXAMPLE = """example:
-              crop_images.py -t GalapagosSenDT128.tempalte --slc_dir ./merged/SLC --geometry_dir ./merged/geom_reference 
-              crop_images.py -t GalapagosSenDT128.tempalte --slc_dir ./merged/SLC --geometry_dir ./merged/geom_reference --output_dir ./merged_crop 
-            """
-
-        parser = argparse.ArgumentParser(description='Crop a subset of all input files and save to output dir given the subset in template file',
-                                         formatter_class=argparse.RawTextHelpFormatter,
-                                         epilog=TEMPLATE + '\n' + EXAMPLE)
-        parser.add_argument('-H', dest='print_example_template', action='store_true',
-                            help='Print/Show the example template file for loading.')
-        parser.add_argument('-t', '--template', type=str, nargs='+',
-                            dest='template_file', help='Template file with path info.')
-        parser.add_argument('-s', '--slc_dir', type=str, dest='slc_dir',
-                            default='./merged/SLC', help='Directory of co-registered full SLCs')
-        parser.add_argument('-g', '--geometry_dir', type=str, dest='geometry_dir',
-                            default='./merged/geom_reference', help='Directory of full geometry files')
-        parser.add_argument('--processor', type=str, dest='processor',
-                            choices={'isce', 'gamma', 'roipac'},
-                            help='InSAR processor/software of the file (This version only supports isce)',
-                            default='isce')
-        parser.add_argument('-o', '--output_dir', type=str, dest='out_dir',
-                            default='./merged_crop', help='Output directory for cropped files')
         return parser
 
     def phase_inversion_parser(self):
@@ -411,26 +381,34 @@ class MinoPyParser:
         return parser
 
     @staticmethod
-    def phase_to_range_parser():
+    def generate_temporal_coherence_parser():
         parser = argparse.ArgumentParser(description='Convert phase to range time series')
         parser.add_argument('-d', '--work_dir', type=str, dest='work_dir', required=True,
                             help='Working directory (minopy)')
-        parser.add_argument('-n', '--num_worker', dest='num_worker', type=int, default=1,
-                           help='Number of parallel tasks (default: 1)')
+        return parser
+
+    @staticmethod
+    def network_inversion_parser():
+        parser = argparse.ArgumentParser(description='Convert phase to range time series')
+        parser.add_argument('-d', '--work_dir', type=str, dest='work_dir', required=True,
+                            help='Working directory (minopy)')
+        parser.add_argument('-t', '--template', dest='template_file', type=str, default=None,
+                            help='template file (default: smallbaselineApp.cfg)')
+
         return parser
 
     @staticmethod
     def minopy_app_parser():
 
         STEP_LIST = [
-            'load_slc',
+            'load_slc_geometry',
             'phase_inversion',
             'generate_ifgram',
             'unwrap_ifgram',
             'load_ifgram',
-            'correct_unwrap_error',
-            'phase_to_range',
-            'mintpy_corrections']
+            'ifgram_correction',
+            'network_inversion',
+            'timeseries_correction']
 
 
         STEP_HELP = """Command line options for steps processing with names are chosen from the following list:
