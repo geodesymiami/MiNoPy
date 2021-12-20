@@ -50,14 +50,14 @@ def main(iargs=None):
     if not inps.sub_index is None:
         inps.sub_index = int(inps.sub_index)
         indx1 = int(inps.sub_index * inps.num_worker)
-        indx2 = int((inps.sub_index + 1) * inps.num_worker) + 1
+        indx2 = int((inps.sub_index + 1) * inps.num_worker) #+ 1
         if indx2 > len(inversionObj.box_list):
             indx2 = len(inversionObj.box_list)
-        print('Total number of PATCHES for job {} : {}'.format(inps.sub_index, indx2-indx1))
+        print('Total number of PATCHES/tasks for job {} : {}'.format(inps.sub_index, indx2-indx1))
     else:
         indx1 = 0
         indx2 = len(inversionObj.box_list)
-        print('Total number of PATCHES: {}'.format(len(inversionObj.box_list)))
+        print('Total number of PATCHES/tasks: {}'.format(len(inversionObj.box_list)))
 
     box_list = []
     for box in inversionObj.box_list[indx1:indx2]:
@@ -70,7 +70,7 @@ def main(iargs=None):
             box_list.append(box)
 
     #print('Total number of PATCHES: {}'.format(len(inversionObj.box_list)))
-    print('Remaining number of PATCHES: {}'.format(len(box_list)))
+    print('Remaining number of PATCHES/tasks: {}'.format(len(box_list)))
 
     num_workers = int(inps.num_worker)
     cpu_count = mp.cpu_count()
