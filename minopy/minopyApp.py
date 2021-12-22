@@ -137,7 +137,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         if self.text_cmd in [None, 'None']:
             self.text_cmd = ''
 
-        self.num_workers = int(self.template['minopy.compute.numProcessor'])
+        self.num_workers = int(self.template['minopy.multiprocessing.numProcessor'])
         if not self.write_job:
             num_cpu = os.cpu_count()
             if self.num_workers > num_cpu:
@@ -350,8 +350,13 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 pairs.append((line.split('_')[0], line.split('\n')[0].split('_')[1]))
         else:
             if self.template['minopy.interferograms.type'] == 'sequential':
-                for i in range(1, len(self.date_list)):
-                        pairs.append((self.date_list[i-1], self.date_list[i]))
+                num_seq = int(self.template['minopy.interferograms.numSequential'])
+                for t in range(0, num_seq-1):
+                    for l in range(t + 1, num_seq):
+                        pairs.append((self.date_list[t], self.date_list[l]))
+                for i in range(num_seq, len(self.date_list)):
+                    for t in range(1, num_seq + 1):
+                        pairs.append((self.date_list[i - t], self.date_list[i]))
 
             if self.template['minopy.interferograms.type'] == 'single_reference':
                 indx = self.date_list.index(reference_date)
@@ -493,8 +498,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                        ' --wavelength {a11}'.format(a1=os.path.join(out_dir, 'filt_fine.int'),
                                                              a2=corr_file,
                                                              a3=os.path.join(out_dir, 'filt_fine.unw'),
-                                                             a4=self.template['minopy.unwrap.maxDiscontinuity'],
-                                                             a5=self.template['minopy.unwrap.initMethod'],
+                                                             a4=self.template['minopy.unwrap.snaphu.maxDiscontinuity'],
+                                                             a5=self.template['minopy.unwrap.snaphu.initMethod'],
                                                              a6=length, a7=width, a8=height, a9=ntiles,
                                                              a10=earth_radius, a11=wavelength)
             if self.template['minopy.unwrap.mask']:
