@@ -83,6 +83,8 @@ class MinoPyParser:
         inps.project_dir = os.path.abspath(inps.project_dir)
         inps.PROJECT_NAME = os.path.basename(inps.project_dir)
         #inps.work_dir = os.path.join(inps.project_dir, 'minopy')
+        if inps.work_dir == 'minopy':
+            inps.work_dir = os.path.abspath(os.path.join(inps.project_dir, inps.work_dir))
         os.makedirs(inps.work_dir, exist_ok=True)
         inps.out_dir = os.path.join(inps.work_dir, 'inputs')
         os.makedirs(inps.out_dir, exist_ok=True)
@@ -259,7 +261,7 @@ class MinoPyParser:
 
         parser.add_argument('-pj', '--project_dir', type=str, dest='project_dir',
                             help='Project directory of SLC dataset to read from')
-        parser.add_argument('-d', '--work_dir', type=str, dest='work_dir', default='./minopy',
+        parser.add_argument('-d', '--work_dir', type=str, dest='work_dir', default='minopy',
                             help='Working directory of minopy (default ./minopy)')
         parser.add_argument('-pr', '--processor', type=str, dest='processor',
                             choices={'isce', 'gamma', 'roipac'},
