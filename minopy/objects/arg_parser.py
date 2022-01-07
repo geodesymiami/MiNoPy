@@ -349,6 +349,7 @@ class MinoPyParser:
 
         return parser
 
+
     @staticmethod
     def unwrap_parser():
         parser = argparse.ArgumentParser(description='Unwrap using snaphu')
@@ -376,6 +377,8 @@ class MinoPyParser:
                             help='Maximum abrupt phase discontinuity (cycles)')
         parser.add_argument('-nt', '--num_tiles', dest='num_tiles', type=int, default=1,
                             help='Number of tiles for Unwrapping in parallel')
+        parser.add_argument('--two-stage', dest='unwrap_2stage', action='store_true',
+                            help='Use 2 stage unwrapping (from ISCE)')
         parser.add_argument('--rmfilter', dest='remove_filter_flag', action='store_true',
                             help='Remove filtering after unwrap')
         parser.add_argument('--tmp', dest='copy_to_tmp', action='store_true', help='Copy and process on tmp')

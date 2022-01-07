@@ -23,7 +23,8 @@ from minopy.defaults.auto_path import autoPath, PathFind
 from minopy.find_short_baselines import find_baselines, plot_baselines
 from minopy.objects.utils import (check_template_auto_value,
                                   log_message, get_latest_template_minopy,
-                                  read_initial_info)
+                                  read_initial_info, read_sensor_extra_info)
+from minopy.load_slc_geometry import read_inps2dict
 
 pathObj = PathFind()
 ###########################################################################################
@@ -143,7 +144,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             if self.num_workers > num_cpu:
                 self.num_workers = num_cpu
                 print('There are {a} workers available, numWorker is changed to {a}'. format(a=num_cpu))
-
         if not self.inps.generate_template:
             self.date_list, self.num_pixels, self.metadata = read_initial_info(self.workDir, self.templateFile)
             self.num_images = len(self.date_list)
@@ -159,6 +159,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 self.metadata['WIDTH'] = int(self.metadata['WIDTH'])
 
             self.ifgram_dir, self.pairs = self.get_interferogram_pairs()
+
+        if 'sensor_type' in self.metadata:
+            self.sensor_type = self.metadata['sensor_type']
+        else:
+            self.sensor_type = 'tops'
 
         os.chdir(self.workDir)
         return
@@ -204,7 +209,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             inps.custom_template_file = self.customTemplateFile
             if self.customTemplateFile is None:
                 inps.custom_template_file = self.templateFile
-            inps.work_dir = self.run_dir
+            inps.work_dir = os.path.dirname(self.run_dir)
             inps.out_dir = self.run_dir
             inps.num_data = self.num_images
             job_obj = JOB_SUBMIT(inps)
@@ -219,6 +224,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         self.run_network_inversion('network_inversion', job_obj)
         self.run_timeseries_correction('timeseries_correction', job_obj)
         del job_obj
+
+
 
         return
 
@@ -394,10 +401,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         run_ifgs = os.path.join(self.run_dir, RUN_FILES[sname])
         print('Generate {}'.format(run_ifgs))
 
-        if 'sensor_type' in self.metadata:
-            sensor_type = self.metadata['sensor_type']
-        else:
-            sensor_type = 'tops'
+
 
         #  command for generating unwrap mask
         cmd_generate_unwrap_mask = '{} generate_unwrap_mask.py --geometry {} '.format(
@@ -429,7 +433,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                                                            a3=out_dir, a4=self.azimuth_look,
                                                            a5=self.range_look,
                                                            a6=self.template['minopy.interferograms.filterStrength'],
-                                                           a7=sensor_type,
+                                                           a7=self.sensor_type,
                                                            a8=tmp_phase_series)
 
             cmd = '{} generate_ifgram.py {}'.format(self.text_cmd.strip("'"), scp_args)
@@ -508,6 +512,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 scp_args += ' --rmfilter'
             if self.copy_to_tmp:
                 scp_args += ' --tmp'
+            if self.template['minopy.unwrap.two-stage']:
+                scp_args += ' --two-stage'
             cmd = '{} unwrap_ifgram.py {}'.format(self.text_cmd.strip("'"), scp_args)
             cmd = cmd.lstrip()
 
