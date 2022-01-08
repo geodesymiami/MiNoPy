@@ -1087,7 +1087,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
         mask = (readfile.read(mask_file.decode('UTF-8'),
                               box=(box[0], box[1], box[2], box[3]))[0]*1).astype(np.int32)
 
-    out_folder = out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
+    out_folder = out_dir + ('/PATCHES/PATCH_{:04.0f}'.format(index)).encode('UTF-8')
 
     os.makedirs(out_folder.decode('UTF-8'), exist_ok=True)
     if os.path.exists(out_folder.decode('UTF-8') + '/flag.npy'):
@@ -1182,7 +1182,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     np.save(out_folder.decode('UTF-8') + '/flag.npy', [1])
 
     mi, se = divmod(time.time()-time0, 60)
-    print('    Phase inversion of PATCH_{} is Completed in {:02.0f} mins {:02.0f} secs\n'.format(index, mi, se))
+    print('    Phase inversion of PATCH_{:04.0f} is Completed in {:02.0f} mins {:02.0f} secs\n'.format(index, mi, se))
 
     return
 

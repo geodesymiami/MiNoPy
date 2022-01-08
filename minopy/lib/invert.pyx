@@ -307,7 +307,7 @@ cdef class CPhaseLink:
         with h5py.File(self.RSLCfile.decode('UTF-8'), 'a') as fhandle:
             
             for index, box in enumerate(self.box_list):
-                patch_dir = self.out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
+                patch_dir = self.out_dir + ('/PATCHES/PATCH_{:04.0f}'.format(index)).encode('UTF-8')
                 rslc_ref = np.load(patch_dir.decode('UTF-8') + '/phase_ref.npy', allow_pickle=True)
                 temp_coh = np.load(patch_dir.decode('UTF-8') + '/tempCoh.npy', allow_pickle=True)
                 shp = np.load(patch_dir.decode('UTF-8') + '/shp.npy', allow_pickle=True)
@@ -385,7 +385,7 @@ cdef class CPhaseLink:
 
         with h5py.File(mask_ps_file.decode('UTF-8'), 'a') as psf:
            for index, box in enumerate(self.box_list):
-               patch_dir = self.out_dir + ('/PATCHES/PATCH_{}'.format(index)).encode('UTF-8')
+               patch_dir = self.out_dir + ('/PATCHES/PATCH_{:04.0f}'.format(index)).encode('UTF-8')
                mask_ps = np.load(patch_dir.decode('UTF-8') + '/mask_ps.npy', allow_pickle=True)
                block = [box[1], box[3], box[0], box[2]]
                write_hdf5_block_2D_int(psf, mask_ps, b'mask', block)

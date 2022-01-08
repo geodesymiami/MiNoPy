@@ -75,7 +75,7 @@ def phase_invert(inps, inversionObj):
     for box in inversionObj.box_list[indx1:indx2]:
         index = box[4]
         out_dir = inversionObj.out_dir.decode('UTF-8')
-        out_folder = out_dir + '/PATCHES/PATCH_{}'.format(index)
+        out_folder = out_dir + '/PATCHES/PATCH_{:04.0f}'.format(index)
         os.makedirs(out_folder, exist_ok=True)
 
         if not os.path.exists(out_folder + '/flag.npy'):
@@ -138,10 +138,10 @@ def concatenate_patches(inversionObj):
     for box in inversionObj.box_list:
         index = box[4]
         out_dir = inversionObj.out_dir.decode('UTF-8')
-        out_folder = out_dir + '/PATCHES/PATCH_{}'.format(index)
+        out_folder = out_dir + '/PATCHES/PATCH_{:04.0f}'.format(index)
         while not os.path.exists(out_folder + '/flag.npy'):
             completed = False
-            print('Error: PATCH_{} is not inverted, run previous step (phase_inversion) to complete'.format(index))
+            print('Error: PATCH_{:04.0f} is not inverted, run previous step (phase_inversion) to complete'.format(index))
     if completed:
         inversionObj.unpatch()
         print('Successfully concatenated')
