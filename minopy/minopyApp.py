@@ -23,14 +23,14 @@ from minopy.defaults.auto_path import autoPath, PathFind
 from minopy.find_short_baselines import find_baselines, plot_baselines
 from minopy.objects.utils import (check_template_auto_value,
                                   log_message, get_latest_template_minopy,
-                                  read_initial_info, read_sensor_extra_info)
-from minopy.load_slc_geometry import read_inps2dict
+                                  read_initial_info)
 
 pathObj = PathFind()
 ###########################################################################################
 STEP_LIST = [
     'load_slc_geometry',
     'phase_inversion',
+    'concatenate_patch'
     'generate_ifgram',
     'unwrap_ifgram',
     'load_ifgram',
@@ -40,12 +40,13 @@ STEP_LIST = [
 
 RUN_FILES = {'load_slc_geometry': 'run_01_minopy_load_slc_geometry',
              'phase_inversion': 'run_02_minopy_phase_inversion',
-             'generate_ifgram': 'run_03_minopy_generate_ifgram',
-             'unwrap_ifgram': 'run_04_minopy_unwrap_ifgram',
-             'load_ifgram': 'run_05_minopy_load_ifgram',
-             'ifgram_correction': 'run_06_mintpy_ifgram_correction',
-             'network_inversion': 'run_07_minopy_network_inversion',
-             'timeseries_correction': 'run_08_mintpy_timeseries_correction'}
+             'concatenate_patch': 'run_03_minopy_concatenate_patch',
+             'generate_ifgram': 'run_04_minopy_generate_ifgram',
+             'unwrap_ifgram': 'run_05_minopy_unwrap_ifgram',
+             'load_ifgram': 'run_06_minopy_load_ifgram',
+             'ifgram_correction': 'run_07_mintpy_ifgram_correction',
+             'network_inversion': 'run_08_minopy_network_inversion',
+             'timeseries_correction': 'run_09_mintpy_timeseries_correction'}
 
 ##########################################################################
 
@@ -217,15 +218,22 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             job_obj = None
         self.run_load_slc_geometry('load_slc_geometry', job_obj)
         self.run_phase_inversion('phase_inversion', job_obj)
+        self.run_phase_inversion('concatenate_patch', job_obj)
         self.run_interferogram('generate_ifgram', job_obj)
         self.run_unwrap('unwrap_ifgram', job_obj)
         self.run_load_ifg('load_ifgram', job_obj)
         self.run_ifgram_correction('ifgram_correction', job_obj)
         self.run_network_inversion('network_inversion', job_obj)
         self.run_timeseries_correction('timeseries_correction', job_obj)
+
         del job_obj
 
-
+        run_file_list = []
+        for key, value in RUN_FILES.items():
+            run_file_list.append(value)
+        with open(self.workDir + '/run_files_list', 'w') as run_file:
+            for item in run_file_list:
+                run_file.writelines(item + '\n')
 
         return
 
@@ -263,9 +271,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         num_length_patch = math.ceil(self.metadata['LENGTH'] / int(self.template['minopy.inversion.patchSize']))
         num_width_patch = math.ceil(self.metadata['WIDTH'] / int(self.template['minopy.inversion.patchSize']))
         num_patches = num_length_patch * num_width_patch
-        print('Total number of PATCHES: {}'.format(num_patches))
+
         number_of_nodes = math.ceil(num_patches / self.num_workers)
-        print('Number of tasks for step 2: {}'.format(number_of_nodes))
         num_bursts = int(self.template['minopy.inversion.patchSize'])**2 // 40000
 
         slc_stack = os.path.join(self.workDir, 'inputs/slcStack.h5')
@@ -276,27 +283,42 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         run_commands = []
 
-        scp_args = '--work_dir {a0} --range_window {a1} --azimuth_window {a2} --method {a3} --test {a4} ' \
-                   '--patch_size {a5} --num_worker {a6} --mini_stack_size {a7} --time_lag {a8} --ps_num_shp {a9}'.format(
+        scp_args = '--work_dir {a0} --range_window {a1} --azimuth_window {a2} --patch_size {a3}'.format(
             a0=self.workDir, a1=self.template['minopy.inversion.rangeWindow'],
-            a2=self.template['minopy.inversion.azimuthWindow'], a3=self.template['minopy.inversion.phaseLinkingMethod'],
-            a4=self.template['minopy.inversion.shpTest'], a5=self.template['minopy.inversion.patchSize'],
-            a6=self.num_workers, a7=self.template['minopy.inversion.ministackSize'],
-            a8=self.template['minopy.inversion.stbas_time_lag'],
-            a9=self.template['minopy.inversion.PsNumShp'])
+            a2=self.template['minopy.inversion.azimuthWindow'], a3=self.template['minopy.inversion.patchSize'])
 
-        if number_of_nodes > 1:
-            for i in range(number_of_nodes):
-                scp_args1 = scp_args + ' --index {}'.format(i)
+        if sname == 'concatenate_patch':
+            command_line = '{a} phase_inversion.py {b} --slc_stack {c} --concatenate\n'.format(
+                a=self.text_cmd.strip("'"), b=scp_args, c=slc_stack)
+
+            run_commands.append(command_line)
+        else:
+            print('Total number of PATCHES: {}'.format(num_patches))
+            print('Number of tasks for step phase inversion: {}'.format(number_of_nodes))
+
+            scp_args += ' --method {a1} --test {a2} --num_worker {a3} ' \
+                        '--mini_stack_size {a4} --time_lag {a5} --ps_num_shp {a6}'.format(
+                a1=self.template['minopy.inversion.phaseLinkingMethod'],
+                a2=self.template['minopy.inversion.shpTest'],
+                a3=self.num_workers, a4=self.template['minopy.inversion.ministackSize'],
+                a5=self.template['minopy.inversion.stbas_time_lag'],
+                a6=self.template['minopy.inversion.PsNumShp'])
+
+            if not self.template['minopy.inversion.mask'] in [None, 'None']:
+                scp_args += ' --mask {}'.format(os.path.abspath(self.template['minopy.inversion.mask']))
+
+            if number_of_nodes > 1:
+                for i in range(number_of_nodes):
+                    scp_args1 = scp_args + ' --index {}'.format(i)
+                    command_line = '{a} phase_inversion.py {b} --slc_stack {c}\n'.format(a=self.text_cmd.strip("'"),
+                                                                                         b=scp_args1,
+                                                                                         c=tmp_slc_stack)
+                    run_commands.append(command_line)
+            else:
                 command_line = '{a} phase_inversion.py {b} --slc_stack {c}\n'.format(a=self.text_cmd.strip("'"),
-                                                                                     b=scp_args1,
+                                                                                     b=scp_args,
                                                                                      c=tmp_slc_stack)
                 run_commands.append(command_line)
-        else:
-            command_line = '{a} phase_inversion.py {b} --slc_stack {c}\n'.format(a=self.text_cmd.strip("'"),
-                                                                                 b=scp_args,
-                                                                                 c=tmp_slc_stack)
-            run_commands.append(command_line)
 
         with open(run_inversion, 'w+') as frun:
             frun.writelines(run_commands)
@@ -512,7 +534,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 scp_args += ' --rmfilter'
             if self.copy_to_tmp:
                 scp_args += ' --tmp'
-            if self.template['minopy.unwrap.two-stage']:
+            if self.template['minopy.unwrap.two-stage'] == 'yes':
                 scp_args += ' --two-stage'
             cmd = '{} unwrap_ifgram.py {}'.format(self.text_cmd.strip("'"), scp_args)
             cmd = cmd.lstrip()
@@ -642,6 +664,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 slc_stack = self.run_phase_inversion('phase_inversion', job_obj)
                 if self.copy_to_tmp:
                     os.system('cp {} /tmp'.format(slc_stack))
+            elif sname == 'concatenate_patch':
+                self.run_phase_inversion('concatenate_patch', job_obj)
             elif sname == 'generate_ifgram':
                 self.run_interferogram('generate_ifgram', job_obj)
             elif sname == 'unwrap_ifgram':

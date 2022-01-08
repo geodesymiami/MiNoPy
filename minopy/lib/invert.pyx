@@ -61,6 +61,7 @@ cdef class CPhaseLink:
         cdef float alpha
         self.inps = inps
         self.work_dir = inps.work_dir.encode('UTF-8')
+        self.mask_file = inps.mask_file.encode('UTF-8')
         self.phase_linking_method = inps.inversion_method.encode('UTF-8')
         self.shp_test = inps.shp_test.encode('UTF-8')
         self.slc_stack = inps.slc_stack.encode('UTF-8')
@@ -261,6 +262,7 @@ cdef class CPhaseLink:
             "shp_test": self.shp_test,
             "out_dir": self.out_dir,
             "time_lag": self.time_lag,
+            "mask_file": self.mask_file,
         }
         return data_kwargs
 

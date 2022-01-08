@@ -299,13 +299,16 @@ class MinoPyParser:
                            help='Number of SHPs for PS candidates')
         patch.add_argument('-p', '--patch_size', type=int, dest='patch_size', default=200,
                            help='Azimuth window size for shp finding')
-        patch.add_argument('-ms', '--mini_stack_size', type=int, dest='ministack_size', default=10,
+        patch.add_argument('-mss', '--mini_stack_size', type=int, dest='ministack_size', default=10,
                            help='Number of images in each mini stack')
         patch.add_argument('-s', '--slc_stack', type=str, dest='slc_stack', help='SLC stack file')
+        patch.add_argument('-ms', '--mask', type=str, dest='mask_file', default='None', help='mask file for inversion')
         patch.add_argument('-n', '--num_worker', dest='num_worker', type=int, default=1,
                            help='Number of parallel tasks (default: 1)')
         patch.add_argument('-i', '--index', dest='sub_index', type=str, default=None,
                            help='The list containing patches of i*num_worker:(i+1)*num_worker')
+        patch.add_argument('-c', '--concatenate', dest='do_concatenate', action='store_false',
+                           help='Concatenate all phase inverted patches')
 
 
         return parser
@@ -408,6 +411,7 @@ class MinoPyParser:
         STEP_LIST = [
             'load_slc_geometry',
             'phase_inversion',
+            'concatenate_patch',
             'generate_ifgram',
             'unwrap_ifgram',
             'load_ifgram',

@@ -41,12 +41,24 @@ def main(iargs=None):
         string = dateStr + " * " + msg
         print(string)
     else:
-        sysargv = ['./inputs/slcStack.h5' if x == '/tmp/slcStack.h5' else x for x in sys.argv[1::]]
+        #sysargv = ['./inputs/slcStack.h5' if x == '/tmp/slcStack.h5' else x for x in sys.argv[1::]]
+        sysargv = [x for x in sys.argv[1::]]
         msg = os.path.basename(__file__) + ' ' + ' '.join(sysargv)
         string = dateStr + " * " + msg
         print(string)
 
     inversionObj = iv.CPhaseLink(inps)
+
+    if inps.do_concatenate:
+        phase_invert(inps, inversionObj)
+    else:
+        concatenate_patches(inversionObj)
+
+    return None
+
+
+def phase_invert(inps, inversionObj):
+
     if not inps.sub_index is None:
         inps.sub_index = int(inps.sub_index)
         indx1 = int(inps.sub_index * inps.num_worker)
@@ -65,7 +77,7 @@ def main(iargs=None):
         out_dir = inversionObj.out_dir.decode('UTF-8')
         out_folder = out_dir + '/PATCHES/PATCH_{}'.format(index)
         os.makedirs(out_folder, exist_ok=True)
-        
+
         if not os.path.exists(out_folder + '/flag.npy'):
             box_list.append(box)
 
@@ -81,7 +93,7 @@ def main(iargs=None):
         num_cores = len(box_list)
     else:
         num_cores = num_workers
-    
+
     print('Number of parallel tasks: {}'.format(num_cores))
     pool = mp.Pool(num_cores, init_worker)
     data_kwargs = inversionObj.get_datakwargs()
@@ -96,7 +108,7 @@ def main(iargs=None):
                    azimuth_window=data_kwargs['azimuth_window'], width=data_kwargs['width'],
                    length=data_kwargs['length'], n_image=data_kwargs['n_image'],
                    slcStackObj=data_kwargs['slcStackObj'], distance_threshold=data_kwargs['distance_threshold'],
-                   reference_row=data_kwargs['reference_row'],reference_col=data_kwargs['reference_col'],
+                   reference_row=data_kwargs['reference_row'], reference_col=data_kwargs['reference_col'],
                    phase_linking_method=data_kwargs['phase_linking_method'],
                    total_num_mini_stacks=data_kwargs['total_num_mini_stacks'],
                    default_mini_stack_size=data_kwargs['default_mini_stack_size'],
@@ -105,9 +117,11 @@ def main(iargs=None):
                    def_sample_rows=data_kwargs['def_sample_rows'],
                    def_sample_cols=data_kwargs['def_sample_cols'],
                    out_dir=data_kwargs['out_dir'],
-                   lag=data_kwargs['time_lag'])
+                   lag=data_kwargs['time_lag'],
+                   mask_file=data_kwargs['mask_file'])
 
     print('Reading SLC data from {} and inverting patches in parallel ...'.format(inps.slc_stack))
+
     try:
         pool.map(func, box_list)
         pool.close()
@@ -117,17 +131,24 @@ def main(iargs=None):
         pool.terminate()
         pool.join()
 
-    if indx2 == len(inversionObj.box_list):
-        for box in inversionObj.box_list:
-            index = box[4]
-            out_dir = inversionObj.out_dir.decode('UTF-8')
-            out_folder = out_dir + '/PATCHES/PATCH_{}'.format(index)
-            while not os.path.exists(out_folder + '/flag.npy'):
-                time.sleep(10)
+    return
 
+def concatenate_patches(inversionObj):
+    completed = True
+    for box in inversionObj.box_list:
+        index = box[4]
+        out_dir = inversionObj.out_dir.decode('UTF-8')
+        out_folder = out_dir + '/PATCHES/PATCH_{}'.format(index)
+        while not os.path.exists(out_folder + '/flag.npy'):
+            completed = False
+            print('Error: PATCH_{} is not inverted, run previous step (phase_inversion) to complete'.format(index))
+    if completed:
         inversionObj.unpatch()
-
-    return None
+        print('Successfully concatenated')
+    else:
+        print('Exit without concatenating')
+        sys.exit(0)
+    return
 
 
 #################################################
