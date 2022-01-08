@@ -62,15 +62,14 @@ def main(iargs=None):
 
         try:
             if do_tiles:
-                print('1')
+                #print('1')
                 unwObj.unwrap_tile()
             else:
-                print('2')
-                #runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata, inps.unwrap_2stage)
+                #print('2')
                 unwObj.unwrap()
 
         except:
-            print('3')
+            #print('3')
             runUnwrap(inps.input_ifg, inps.unwrapped_ifg, inps.input_cor, metadata, inps.unwrap_2stage)
 
     if inps.unwrap_2stage:
