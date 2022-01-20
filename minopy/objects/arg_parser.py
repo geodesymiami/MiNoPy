@@ -31,8 +31,8 @@ class MinoPyParser:
 
         if self.script == 'load_slc':
             self.parser = self.load_slc_parser()
-        elif self.script == 'phase_inversion':
-            self.parser = self.phase_inversion_parser()
+        elif self.script == 'phase_linking':
+            self.parser = self.phase_linking_parser()
         elif self.script == 'generate_interferograms':
             self.parser = self.generate_interferograms_parser()
         elif self.script == 'generate_mask':
@@ -277,7 +277,7 @@ class MinoPyParser:
                             help='Output HDF5 file')
         return parser
 
-    def phase_inversion_parser(self):
+    def phase_linking_parser(self):
         parser = self.parser
         patch = parser.add_argument_group('Phase inversion option')
         patch.add_argument('-w', '--work_dir', type=str, dest='work_dir', help='Working directory (minopy)')
@@ -406,7 +406,7 @@ class MinoPyParser:
 
         STEP_LIST = [
             'load_slc_geometry',
-            'phase_inversion',
+            'phase_linking',
             'concatenate_patch',
             'generate_ifgram',
             'unwrap_ifgram',

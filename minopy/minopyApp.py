@@ -29,7 +29,7 @@ pathObj = PathFind()
 ###########################################################################################
 STEP_LIST = [
     'load_slc_geometry',
-    'phase_inversion',
+    'phase_linking',
     'concatenate_patch'
     'generate_ifgram',
     'unwrap_ifgram',
@@ -39,7 +39,7 @@ STEP_LIST = [
     'timeseries_correction']
 
 RUN_FILES = {'load_slc_geometry': 'run_01_minopy_load_slc_geometry',
-             'phase_inversion': 'run_02_minopy_phase_inversion',
+             'phase_linking': 'run_02_minopy_phase_linking',
              'concatenate_patch': 'run_03_minopy_concatenate_patch',
              'generate_ifgram': 'run_04_minopy_generate_ifgram',
              'unwrap_ifgram': 'run_05_minopy_unwrap_ifgram',
@@ -205,8 +205,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         else:
             job_obj = None
         self.run_load_slc_geometry('load_slc_geometry', job_obj)
-        self.run_phase_inversion('phase_inversion', job_obj)
-        self.run_phase_inversion('concatenate_patch', job_obj)
+        self.run_phase_linking('phase_linking', job_obj)
+        self.run_phase_linking('concatenate_patch', job_obj)
         self.run_interferogram('generate_ifgram', job_obj)
         self.run_unwrap('unwrap_ifgram', job_obj)
         self.run_load_ifg('load_ifgram', job_obj)
@@ -250,7 +250,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         return
 
-    def run_phase_inversion(self, sname, job_obj):
+    def run_phase_linking(self, sname, job_obj):
         """ Non-Linear phase inversion.
         """
         run_inversion = os.path.join(self.run_dir, RUN_FILES[sname])
@@ -276,7 +276,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             a2=self.template['minopy.inversion.azimuthWindow'], a3=self.template['minopy.inversion.patchSize'])
 
         if sname == 'concatenate_patch':
-            command_line = '{a} phase_inversion.py {b} --slc_stack {c} --concatenate\n'.format(
+            command_line = '{a} phase_linking.py {b} --slc_stack {c} --concatenate\n'.format(
                 a=self.text_cmd.strip("'"), b=scp_args, c=slc_stack)
 
             run_commands.append(command_line)
@@ -298,12 +298,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             if number_of_nodes > 1:
                 for i in range(number_of_nodes):
                     scp_args1 = scp_args + ' --index {}'.format(i)
-                    command_line = '{a} phase_inversion.py {b} --slc_stack {c}\n'.format(a=self.text_cmd.strip("'"),
+                    command_line = '{a} phase_linking.py {b} --slc_stack {c}\n'.format(a=self.text_cmd.strip("'"),
                                                                                          b=scp_args1,
                                                                                          c=tmp_slc_stack)
                     run_commands.append(command_line)
             else:
-                command_line = '{a} phase_inversion.py {b} --slc_stack {c}\n'.format(a=self.text_cmd.strip("'"),
+                command_line = '{a} phase_linking.py {b} --slc_stack {c}\n'.format(a=self.text_cmd.strip("'"),
                                                                                      b=scp_args,
                                                                                      c=tmp_slc_stack)
                 run_commands.append(command_line)
@@ -648,12 +648,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             job_obj = None
             if sname == 'load_slc_geometry':
                 self.run_load_slc_geometry('load_slc_geometry', job_obj)
-            elif sname == 'phase_inversion':
-                slc_stack = self.run_phase_inversion('phase_inversion', job_obj)
+            elif sname == 'phase_linking':
+                slc_stack = self.run_phase_linking('phase_linking', job_obj)
                 if self.copy_to_tmp:
                     os.system('cp {} /tmp'.format(slc_stack))
             elif sname == 'concatenate_patch':
-                self.run_phase_inversion('concatenate_patch', job_obj)
+                self.run_phase_linking('concatenate_patch', job_obj)
             elif sname == 'generate_ifgram':
                 self.run_interferogram('generate_ifgram', job_obj)
             elif sname == 'unwrap_ifgram':
