@@ -90,11 +90,11 @@ def main(iargs=None):
     start_time = time.time()
     os.chdir(inps.work_dir)
 
-    minopy_template_file = os.path.join(inps.work_dir, 'minopyApp.cfg')
+    minopy_dir = os.path.dirname(inps.work_dir)
+    minopy_template_file = os.path.join(minopy_dir, 'minopyApp.cfg')
     inps.ifgramStackFile = os.path.join(inps.work_dir, 'inputs/ifgramStack.h5')
 
     template = readfile.read_template(minopy_template_file)
-
     if template['minopy.timeseries.tempCohType'] == 'auto':
         template['minopy.timeseries.tempCohType'] = 'full'
 
@@ -109,11 +109,11 @@ def main(iargs=None):
     length, width = stack_obj.length, stack_obj.width
 
     inps.invQualityFile = 'temporalCoherence.h5'
-    quality_name = os.path.join(inps.work_dir,
+    quality_name = os.path.join(minopy_dir,
                                 'inverted/tempCoh_{}_msk'.format(template['minopy.timeseries.tempCohType']))
     quality = np.memmap(quality_name, mode='r', dtype='float32', shape=(length, width))
 
-    # inps.waterMaskFile = os.path.join(inps.work_dir, 'waterMask.h5')
+    # inps.waterMaskFile = os.path.join(minopy_dir, 'waterMask.h5')
     inps.waterMaskFile = None
     water_mask = quality * 0 + 1
     if template['minopy.timeseries.waterMask'] != 'auto':
@@ -125,8 +125,8 @@ def main(iargs=None):
                 else:
                     water_mask = f2['mask'][:, :]
 
-    if os.path.exists(os.path.join(inps.work_dir, 'shadow_mask.h5')):
-        with h5py.File(os.path.join(inps.work_dir, 'shadow_mask.h5'), 'r') as f2:
+    if os.path.exists(os.path.join(minopy_dir, 'shadow_mask.h5')):
+        with h5py.File(os.path.join(minopy_dir, 'shadow_mask.h5'), 'r') as f2:
             shadow_mask = f2['mask'][:, :]
             water_mask = water_mask * shadow_mask
 

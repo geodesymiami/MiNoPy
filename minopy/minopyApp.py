@@ -90,7 +90,18 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         """
 
     def __init__(self, customTemplateFile=None, workDir=None, inps=None):
-        super().__init__(customTemplateFile, workDir)
+
+        self.org_custom_template = customTemplateFile
+
+        if not customTemplateFile is None:
+            custom_mintpy_temp = os.path.dirname(customTemplateFile) + '/custom_smallbaselineApp.cfg'
+        else:
+            custom_mintpy_temp = os.path.dirname(inps.templateFile) + '/custom_smallbaselineApp.cfg'
+
+        if os.path.exists(custom_mintpy_temp):
+            super().__init__(custom_mintpy_temp, workDir)
+        else:
+            super().__init__(customTemplateFile, workDir)
         self.inps = inps
         self.write_job = inps.write_job
         self.run_flag = inps.run_flag
@@ -100,8 +111,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
     def open(self):
         super().open()
-
-        self.templateFile_mintpy = self.templateFile
+        self.templateFile_mintpy = os.path.dirname(self.templateFile) + '/custom_smallbaselineApp.cfg'
+        shutil.move(self.templateFile, self.templateFile_mintpy)
         self.template_mintpy = self.template
 
         # Read minopy templates and add to mintpy template
@@ -114,7 +125,10 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         self.run_dir = os.path.join(self.workDir, pathObj.rundir)
         os.makedirs(self.run_dir, exist_ok=True)
-        #self.ifgram_dir = os.path.join(self.workDir, pathObj.intdir)
+
+        self.out_dir_network = '{}/{}'.format(self.workDir,
+                                              self.template['minopy.interferograms.type'] + '_network')
+        os.makedirs(self.out_dir_network, exist_ok=True)
 
         self.azimuth_look = 1
         self.range_look = 1
@@ -155,22 +169,23 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             self.sensor_type = 'tops'
 
         os.chdir(self.workDir)
+        shutil.rmtree(self.workDir + '/pic')
         return
 
     def _read_template_minopy(self):
-        if self.customTemplateFile:
+        if self.org_custom_template:
             # Update default template file based on custom template
             print('update default template based on input custom template')
             self.templateFile = ut.update_template_file(self.templateFile, self.customTemplate)
 
         # 2) backup custome/default template file in inputs/pic folder
-        for backup_dirname in ['inputs', 'pic']:
+        for backup_dirname in ['inputs']:
             backup_dir = os.path.join(self.workDir, backup_dirname)
             # create directory
             os.makedirs(backup_dir, exist_ok=True)
 
             # back up to the directory
-            for tfile in [self.customTemplateFile, self.templateFile]:
+            for tfile in [self.org_custom_template, self.templateFile]:
                 if tfile and ut.run_or_skip(out_file=os.path.join(backup_dir, os.path.basename(tfile)),
                                             in_file=tfile,
                                             check_readable=False,
@@ -195,8 +210,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         if self.write_job:
             from minsar.job_submission import JOB_SUBMIT
             inps = self.inps
-            inps.custom_template_file = self.customTemplateFile
-            if self.customTemplateFile is None:
+            inps.custom_template_file = self.org_custom_template
+            if self.org_custom_template is None:
                 inps.custom_template_file = self.templateFile
             inps.work_dir = os.path.dirname(self.run_dir)
             inps.out_dir = self.run_dir
@@ -400,7 +415,13 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         for pair in pairs:
             ind1.append(self.date_list.index(pair[0]))
             ind2.append(self.date_list.index(pair[1]))
-        plot_baselines(ind1=ind1, ind2=ind2, dates=self.date_list, baseline_dir=baseline_dir, out_dir=self.workDir)
+        plot_baselines(ind1=ind1, ind2=ind2, dates=self.date_list,
+                       baseline_dir=baseline_dir, out_dir=self.out_dir_network)
+
+        if self.template['minopy.interferograms.list'] in [None, 'None', 'auto']:
+            ifgdates = ['{}_{}\n'.format(self.date_list[g], self.date_list[h]) for g, h in zip(ind1, ind2)]
+            with open(os.path.join(self.out_dir_network, 'interferograms_list.txt'), 'w') as f:
+                f.writelines(ifgdates)
 
         return ifgram_dir, pairs
 
@@ -410,8 +431,6 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         """
         run_ifgs = os.path.join(self.run_dir, RUN_FILES[sname])
         print('Generate {}'.format(run_ifgs))
-
-
 
         #  command for generating unwrap mask
         cmd_generate_unwrap_mask = '{} generate_unwrap_mask.py --geometry {} '.format(
@@ -559,14 +578,16 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         # 1) copy aux files (optional)
         super()._copy_aux_file()
 
+        os.makedirs(self.out_dir_network + '/inputs', exist_ok=True)
+
         # 2) loading data
         scp_args = '--template {}'.format(self.templateFile)
-        if self.customTemplateFile:
-            scp_args += ' {}'.format(self.customTemplateFile)
+        if self.org_custom_template:
+            scp_args += ' {}'.format(self.org_custom_template)
 
         if self.projectName:
             scp_args += ' --project {}'.format(self.projectName)
-        scp_args += ' --output {}'.format(self.workDir + '/inputs/ifgramStack.h5')
+        scp_args += ' --output {a}/inputs/ifgramStack.h5 {a}/inputs/geometryRadar.h5 {a}/inputs/geometryGeo.h5'.format(a=self.out_dir_network)
 
         run_commands = ['{} load_ifgram.py {}\n'.format(self.text_cmd.strip("'"), scp_args)]
         run_commands = run_commands[0].lstrip()
@@ -585,9 +606,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         run_file_correct_unwrap = os.path.join(self.run_dir, RUN_FILES[sname])
         print('Generate {}'.format(run_file_correct_unwrap))
-
         run_commands = ['{} smallbaselineApp.py {} '.format(self.text_cmd.strip("'"), self.templateFile_mintpy) +
-                        '--start reference_point --stop correct_unwrap_error --dir {}\n'.format(self.workDir)]
+                        '--start reference_point --stop correct_unwrap_error --dir {}\n'.format(self.out_dir_network)]
         run_commands = run_commands[0].lstrip()
         os.makedirs(self.run_dir, exist_ok=True)
 
@@ -607,7 +627,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         run_commands = ['{} network_inversion.py --template {} --work_dir {}\n'.format(self.text_cmd.strip("'"),
                                                                                        self.templateFile_mintpy,
-                                                                                       self.workDir)]
+                                                                                       self.out_dir_network)]
         run_commands = run_commands[0].lstrip()
         os.makedirs(self.run_dir, exist_ok=True)
 
@@ -626,7 +646,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         run_commands = ['{} smallbaselineApp.py {} --start correct_LOD --dir {}\n'.format(self.text_cmd.strip("'"),
                                                                                           self.templateFile_mintpy,
-                                                                                          self.workDir)]
+                                                                                          self.out_dir_network)]
 
         run_commands = run_commands[0].lstrip()
         os.makedirs(self.run_dir, exist_ok=True)

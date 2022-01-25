@@ -1089,12 +1089,14 @@ def read_subset_template2box(template_file):
 
 def read_subset_box(inpsDict):
     import mintpy.load_data as mld
+    from mintpy import subset
 
     # Read subset info from template
     inpsDict['box'] = None
     inpsDict['box4geo_lut'] = None
 
-    pix_box, geo_box = read_subset_template2box(inpsDict['template_file'][0])
+    #pix_box, geo_box = read_subset_template2box(inpsDict['template_file'][0])
+    pix_box, geo_box = subset.read_subset_template2box(inpsDict['template_file'][0])
 
     # Grab required info to read input geo_box into pix_box
 

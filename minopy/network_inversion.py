@@ -34,11 +34,12 @@ def main(iargs=None):
 
     start_time = time.time()
     os.chdir(inps.work_dir)
+    minopy_dir = os.path.dirname(inps.work_dir)
 
     if inps.template_file is None:
-        inps.template_file = os.path.join(inps.work_dir, 'smallbaselineApp.cfg')
+        inps.template_file = os.path.join(minopy_dir, 'smallbaselineApp.cfg')
 
-    minopy_template_file = os.path.join(inps.work_dir, 'minopyApp.cfg')
+    minopy_template_file = os.path.join(minopy_dir, 'minopyApp.cfg')
     inps.ifgramStackFile = os.path.join(inps.work_dir, 'inputs/ifgramStack.h5')
 
     template = readfile.read_template(minopy_template_file)
