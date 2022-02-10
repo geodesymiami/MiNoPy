@@ -244,7 +244,7 @@ class geometryDict(GDict):
         self.get_metadata()
         if extra_metadata:
             self.metadata.update(extra_metadata)
-            print('add extra metadata: {}'.format(extra_metadata))
+            #print('add extra metadata: {}'.format(extra_metadata))
         self.metadata = attr.update_attribute4subset(self.metadata, box)
         self.metadata['FILE_TYPE'] = self.name
         for key, value in self.metadata.items():
