@@ -110,12 +110,13 @@ def main(iargs=None):
 
     inps.invQualityFile = 'temporalCoherence.h5'
     quality_name = os.path.join(minopy_dir,
-                                'inverted/tempCoh_{}_msk'.format(template['minopy.timeseries.tempCohType']))
+                                'inverted/tempCoh_{}'.format(template['minopy.timeseries.tempCohType']))
     quality = np.memmap(quality_name, mode='r', dtype='float32', shape=(length, width))
 
     # inps.waterMaskFile = os.path.join(minopy_dir, 'waterMask.h5')
     inps.waterMaskFile = None
-    water_mask = quality * 0 + 1
+    water_mask = np.ones(quality.shape, dtype=np.int8)
+
     if template['minopy.timeseries.waterMask'] != 'auto':
         inps.waterMaskFile = template['minopy.timeseries.waterMask']
         if os.path.exists(inps.waterMaskFile):
@@ -125,16 +126,26 @@ def main(iargs=None):
                 else:
                     water_mask = f2['mask'][:, :]
 
-    if os.path.exists(os.path.join(minopy_dir, 'shadow_mask.h5')):
-        with h5py.File(os.path.join(minopy_dir, 'shadow_mask.h5'), 'r') as f2:
-            shadow_mask = f2['mask'][:, :]
-            water_mask = water_mask * shadow_mask
-
+    if inps.shadow_mask:
+        if os.path.exists(os.path.join(minopy_dir, 'shadow_mask.h5')):
+            with h5py.File(os.path.join(minopy_dir, 'shadow_mask.h5'), 'r') as f2:
+                shadow_mask = f2['mask'][:, :]
+                water_mask = water_mask * shadow_mask
+    
     inv_quality = np.zeros((quality.shape[0], quality.shape[1]))
     inv_quality_name = 'temporalCoherence'
     inv_quality[:, :] = quality[:, :]
     inv_quality[inv_quality <= 0] = np.nan
     inv_quality[water_mask < 0.5] = np.nan
+
+    if not os.path.exists(inps.invQualityFile):
+        metadata['UNIT'] = '1'
+        metadata['FILE_TYPE'] = inv_quality_name
+        if 'REF_DATE' in metadata:
+            metadata.pop('REF_DATE')
+        ds_name_dict = {metadata['FILE_TYPE']: [np.float32, (length, width)]}
+        writefile.layout_hdf5(inps.invQualityFile, ds_name_dict, metadata=metadata)
+
     # write the block to disk
     # with 3D block in [z0, z1, y0, y1, x0, x1]
     # and  2D block in         [y0, y1, x0, x1]
