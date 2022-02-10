@@ -69,8 +69,8 @@ def main(iargs=None):
     if iDict['processor'] == 'aria':
         return
 
-    #iDict = mut.read_subset_box(iDict)
-    iDict = mld.read_subset_box(iDict)
+    iDict = mut.read_subset_box(iDict)
+    #iDict = mld.read_subset_box(iDict)
 
     extraDict = mld.get_extra_metadata(iDict)
 
