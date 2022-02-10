@@ -23,29 +23,29 @@ from minopy.defaults.auto_path import autoPath, PathFind
 from minopy.find_short_baselines import find_baselines, plot_baselines
 from minopy.objects.utils import (check_template_auto_value,
                                   log_message, get_latest_template_minopy,
-                                  read_initial_info)
+                                  read_initial_info, find_one_year_interferograms)
 
 pathObj = PathFind()
 ###########################################################################################
 STEP_LIST = [
-    'load_slc_geometry',
+    'load_data',
     'phase_linking',
     'concatenate_patch'
     'generate_ifgram',
     'unwrap_ifgram',
     'load_ifgram',
     'ifgram_correction',
-    'network_inversion',
+    'invert_network',
     'timeseries_correction']
 
-RUN_FILES = {'load_slc_geometry': 'run_01_minopy_load_slc_geometry',
+RUN_FILES = {'load_data': 'run_01_minopy_load_data',
              'phase_linking': 'run_02_minopy_phase_linking',
              'concatenate_patch': 'run_03_minopy_concatenate_patch',
              'generate_ifgram': 'run_04_minopy_generate_ifgram',
              'unwrap_ifgram': 'run_05_minopy_unwrap_ifgram',
              'load_ifgram': 'run_06_minopy_load_ifgram',
              'ifgram_correction': 'run_07_mintpy_ifgram_correction',
-             'network_inversion': 'run_08_minopy_network_inversion',
+             'invert_network': 'run_08_minopy_invert_network',
              'timeseries_correction': 'run_09_mintpy_timeseries_correction'}
 
 ##########################################################################
@@ -228,14 +228,14 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             job_obj = JOB_SUBMIT(inps)
         else:
             job_obj = None
-        self.run_load_slc_geometry('load_slc_geometry', job_obj)
+        self.run_load_data('load_data', job_obj)
         self.run_phase_linking('phase_linking', job_obj)
         self.run_phase_linking('concatenate_patch', job_obj)
         self.run_interferogram('generate_ifgram', job_obj)
         self.run_unwrap('unwrap_ifgram', job_obj)
         self.run_load_ifg('load_ifgram', job_obj)
         self.run_ifgram_correction('ifgram_correction', job_obj)
-        self.run_network_inversion('network_inversion', job_obj)
+        self.run_network_inversion('invert_network', job_obj)
         self.run_timeseries_correction('timeseries_correction', job_obj)
 
         del job_obj
@@ -249,7 +249,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         return
 
-    def run_load_slc_geometry(self, sname, job_obj):
+    def run_load_data(self, sname, job_obj):
         """ Loading images using load_slc.py script and crop is subsets are given.
         """
         run_file_load_slc = os.path.join(self.run_dir, RUN_FILES[sname])
@@ -313,7 +313,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 a1=self.template['minopy.inversion.phaseLinkingMethod'],
                 a2=self.template['minopy.inversion.shpTest'],
                 a3=self.num_workers, a4=self.template['minopy.inversion.ministackSize'],
-                a5=self.template['minopy.inversion.stbas_time_lag'],
+                a5=self.template['minopy.inversion.stbas_numCon'],
                 a6=self.template['minopy.inversion.PsNumShp'])
 
             if not self.template['minopy.inversion.mask'] in [None, 'None']:
@@ -421,6 +421,10 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                     #if not indx_ref_0 is None:
                     #    pairs.append((self.date_list[indx_ref_0], self.date_list[indx_ref_1]))
                     #indx_ref_0 = indx_ref_1
+        if self.template['minopy.interferograms.oneYear'] in ['yes', True]:
+            one_years = find_one_year_interferograms(self.date_list)
+            pairs += one_years
+
         for pair in pairs:
             ind1.append(self.date_list.index(pair[0]))
             ind2.append(self.date_list.index(pair[1]))
@@ -615,8 +619,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         run_file_correct_unwrap = os.path.join(self.run_dir, RUN_FILES[sname])
         print('Generate {}'.format(run_file_correct_unwrap))
-        run_commands = ['{} smallbaselineApp.py {} '.format(self.text_cmd.strip("'"), self.templateFile_mintpy) +
-                        '--start reference_point --stop correct_unwrap_error --dir {}\n'.format(self.out_dir_network)]
+        custom_template = self.templateFile_mintpy
+        if self.org_custom_template:
+            custom_template = self.org_custom_template
+        run_commands = ['{} smallbaselineApp.py {} '.format(self.text_cmd.strip("'"), custom_template) +
+                        '--start modify_network --stop correct_unwrap_error --dir {}\n'.format(self.out_dir_network)]
         run_commands = run_commands[0].lstrip()
         os.makedirs(self.run_dir, exist_ok=True)
 
@@ -634,9 +641,17 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         run_file_network_inversion = os.path.join(self.run_dir, RUN_FILES[sname])
         print('Generate {}'.format(run_file_network_inversion))
 
-        run_commands = ['{} network_inversion.py --template {} --work_dir {}\n'.format(self.text_cmd.strip("'"),
-                                                                                       self.templateFile_mintpy,
-                                                                                       self.out_dir_network)]
+        custom_template = self.templateFile_mintpy
+        if self.org_custom_template:
+            custom_template = self.org_custom_template
+
+        cmd = '{} network_inversion.py --template {} --work_dir {}'.format(self.text_cmd.strip("'"),
+                                                                       custom_template,
+                                                                       self.out_dir_network)
+        if self.template['minopy.timeseries.shadowMask'] in [True, 'yes']:
+            cmd += ' --shadow_mask'
+
+        run_commands = [cmd]
         run_commands = run_commands[0].lstrip()
         os.makedirs(self.run_dir, exist_ok=True)
 
@@ -653,8 +668,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         run_file_corrections = os.path.join(self.run_dir, RUN_FILES[sname])
         print('Generate {}'.format(run_file_corrections))
 
+        custom_template = self.templateFile_mintpy
+        if self.org_custom_template:
+            custom_template = self.org_custom_template
+
         run_commands = ['{} smallbaselineApp.py {} --start correct_LOD --dir {}\n'.format(self.text_cmd.strip("'"),
-                                                                                          self.templateFile_mintpy,
+                                                                                          custom_template,
                                                                                           self.out_dir_network)]
 
         run_commands = run_commands[0].lstrip()
@@ -675,8 +694,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             if not sname in ['correct_unwrap_error', 'mintpy_corrections']:
                 print('\n\n******************** step - {} ********************'.format(sname))
             job_obj = None
-            if sname == 'load_slc_geometry':
-                self.run_load_slc_geometry('load_slc_geometry', job_obj)
+            if sname == 'load_data':
+                self.run_load_data('load_data', job_obj)
             elif sname == 'phase_linking':
                 slc_stack = self.run_phase_linking('phase_linking', job_obj)
                 if self.copy_to_tmp:
@@ -691,8 +710,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 self.run_load_ifg('load_ifgram', job_obj)
             elif sname == 'ifgram_correction':
                 self.run_ifgram_correction('ifgram_correction', job_obj)
-            elif sname == 'network_inversion':
-                self.run_network_inversion('network_inversion', job_obj)
+            elif sname == 'invert_network':
+                self.run_network_inversion('invert_network', job_obj)
             elif sname == 'timeseries_correction':
                 self.run_timeseries_correction('timeseries_correction', job_obj)
 
