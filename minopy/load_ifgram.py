@@ -21,8 +21,7 @@ from mintpy.objects.stackDict import (geometryDict,
                                       ifgramStackDict,
                                       ifgramDict)
 from mintpy.utils import readfile, ptime, utils as ut
-#from mintpy.utils import isce_utils
-from minopy.objects.utils import check_template_auto_value
+from minopy.objects.utils import check_template_auto_value, read_subset_template2box
 from mintpy import subset
 import datetime
 
@@ -202,7 +201,7 @@ def read_subset_box(inpsDict):
     # Read subset info from template
     inpsDict['box'] = None
     inpsDict['box4geo_lut'] = None
-    pix_box, geo_box = subset.read_subset_template2box(inpsDict['template_file'][0])
+    pix_box, geo_box = read_subset_template2box(inpsDict['template_file'][0])
 
     # Grab required info to read input geo_box into pix_box
     try:
@@ -250,7 +249,7 @@ def read_subset_box(inpsDict):
     if geo_box is not None:
         pix_box = (0, 0, int(atr['width']), int(atr['length']))    # coord.bbox_geo2radar(geo_box)
         pix_box = coord.check_box_within_data_coverage(pix_box)
-        print('input bounding box of interest in lalo: {}'.format(geo_box))
+        print('input bounding box of interest in lalo: {}'.format((geo_box[1], geo_box[0], geo_box[3], geo_box[2])))
     print('box to read for datasets in y/x: {}'.format(pix_box))
 
     # Get box for geocoded lookup table (for gamma/roipac)
@@ -363,9 +362,9 @@ def main(iargs=None):
 
     inpsDict = read_subset_box(inpsDict)
     extraDict = get_extra_metadata(inpsDict)
-
+    
     if not 'PLATFORM' in extraDict:
-        slcStack = os.path.join(inps.outdir, 'slcStack.h5')
+        slcStack = os.path.join(os.path.dirname(work_dir), 'inputs/slcStack.h5')
         atr = readfile.read_attribute(slcStack)
         if 'PLATFORM' in atr:
             extraDict['PLATFORM'] = atr['PLATFORM']
