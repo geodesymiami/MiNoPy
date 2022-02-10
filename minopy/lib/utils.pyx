@@ -425,7 +425,7 @@ cdef tuple test_PS_cy(float complex[:, ::1] coh_mat, float[::1] amplitude):
     #cdef float[::1] amplitude_diff = np.empty(ns, dtype=np.float32)
     cdef cnp.ndarray[float complex, ndim=2] Eigen_vector
     cdef float complex[::1] vec = np.zeros(ns, dtype=np.complex64)
-    cdef float s, temp_quality, amp_dispersion, amp_diff_dispersion
+    cdef float s, temp_quality, amp_dispersion, amp_diff_dispersion, top_percentage
     cdef float complex x0
     
     #amplitude_diff = np.zeros(n, dtype=np.float32)
@@ -437,10 +437,13 @@ cdef tuple test_PS_cy(float complex[:, ::1] coh_mat, float[::1] amplitude):
         # amplitude_diff[i] = amplitude[i]-amplitude[0]
 
     s = sqrt(s)
+    top_percentage = Eigen_value[ns-1]*(100 / s)
     # amp_diff_dispersion = np.std(amplitude_diff)/np.mean(amplitude)
     amp_dispersion = np.std(amplitude)/np.mean(amplitude)
+    if amp_dispersion > 1:
+        amp_dispersion = 1
 
-    if Eigen_value[ns-1]*(100 / s) > 80 and amp_dispersion < 0.39:
+    if top_percentage > 95 and amp_dispersion < 0.42:
 
         temp_quality = 1
     else:
@@ -450,8 +453,10 @@ cdef tuple test_PS_cy(float complex[:, ::1] coh_mat, float[::1] amplitude):
             vec[i] = Eigen_vector[i, ns-1] * conjf(x0)
 
         temp_quality = gam_pta_c(angmat2(coh_mat), vec)
+        if temp_quality == 1:
+            temp_quality = 0.95
 
-    return temp_quality, vec, amp_dispersion, Eigen_value[ns-1], Eigen_value[ns-2]
+    return temp_quality, vec, amp_dispersion, Eigen_value[ns-1], Eigen_value[ns-2], top_percentage
 
 cdef inline float norm_complex(float complex[::1] x):
     cdef cnp.intp_t n = x.shape[0]
@@ -1054,7 +1059,7 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
     cdef int box_length = box[3] - box[1]
     cdef cnp.ndarray[float complex, ndim=3] rslc_ref = np.zeros((n_image, box_length, box_width), dtype=np.complex64)
     cdef cnp.ndarray[float, ndim=3] tempCoh = np.zeros((2, box_length, box_width), dtype=np.float32)
-    cdef cnp.ndarray[float, ndim=3] PSprod = np.zeros((3, box_length, box_width), dtype=np.float32)
+    cdef cnp.ndarray[float, ndim=3] PSprod = np.zeros((4, box_length, box_width), dtype=np.float32)
     cdef cnp.ndarray[int, ndim=2] mask_ps = np.zeros((box_length, box_width), dtype=np.int32)
     cdef cnp.ndarray[int, ndim=2] SHP = np.zeros((box_length, box_width), dtype=np.int32)
     cdef int row1 = box[1] - big_box[1]
@@ -1127,10 +1132,11 @@ def process_patch_c(cnp.ndarray[int, ndim=1] box, int range_window, int azimuth_
                     vec_refined[m] = patch_slc_images[m, data[0], data[1]]  * x0
                     amp_refined[m] = cabsf(patch_slc_images[m, data[0], data[1]])
 
-                temp_quality, vec, amp_disp, eigv1, eigv2 = test_PS_cy(coh_mat, amp_refined)
+                temp_quality, vec, amp_disp, eigv1, eigv2, top_percent = test_PS_cy(coh_mat, amp_refined)
                 PSprod[0, data[0] - row1, data[1] - col1] = amp_disp
                 PSprod[1, data[0] - row1, data[1] - col1] = eigv1
                 PSprod[2, data[0] - row1, data[1] - col1] = eigv2
+                PSprod[3, data[0] - row1, data[1] - col1] = top_percent
 
                 if temp_quality == 1:
                     mask_ps[data[0] - row1, data[1] - col1] = 1

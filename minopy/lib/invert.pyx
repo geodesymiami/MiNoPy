@@ -284,7 +284,7 @@ cdef class CPhaseLink:
         cdef cnp.ndarray[int, ndim=1] box
         cdef bytes patch_dir
         cdef float complex[:, :, ::1] rslc_ref
-        cdef cnp.ndarray[float, ndim=3] temp_coh, ps_prod, eig_values = np.zeros((2, self.length, self.width), dtype=np.float32)
+        cdef cnp.ndarray[float, ndim=3] temp_coh, ps_prod, eig_values = np.zeros((3, self.length, self.width), dtype=np.float32)
         cdef cnp.ndarray[float, ndim=2] amp_disp = np.zeros((self.length, self.width), dtype=np.float32)
 
         if os.path.exists(self.RSLCfile.decode('UTF-8')):
@@ -331,7 +331,7 @@ cdef class CPhaseLink:
                 # temporal coherence - 3D
                 block = [0, 2, box[1], box[3], box[0], box[2]]
                 write_hdf5_block_3D(fhandle, temp_coh, b'temporalCoherence', block)
-                eig_values[0:2, block[2]:block[3], block[4]:block[5]] = ps_prod[1:3, :, :]
+                eig_values[0:3, block[2]:block[3], block[4]:block[5]] = ps_prod[1:4, :, :]
 
             print('write amplitude dispersion and top eigen values')
             amp_disp_file = self.out_dir + b'/amp_dipersion_index'
@@ -358,9 +358,9 @@ cdef class CPhaseLink:
                                            shape=(3, self.length, self.width))
 
             print(top_eig_memmap.shape, np.array(eig_values).shape)
-            top_eig_memmap[0:2, :, :] = eig_values[:, :, :]
-            top_eig_memmap[2, :, :] = eig_values[1, :, :]/eig_values[0, :, :]
-            rr, cc = np.where(np.isnan(top_eig_memmap[2, :, :]))
+            top_eig_memmap[0:3, :, :] = eig_values[:, :, :]
+            #top_eig_memmap[2, :, :] = eig_values[1, :, :]/eig_values[0, :, :]
+            rr, cc, kk = np.where(np.isnan(top_eig_memmap))
             top_eig_memmap[:, rr, cc] = np.nan
             top_eig_memmap = None
 
