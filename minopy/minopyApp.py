@@ -135,8 +135,14 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         self.run_dir = os.path.join(self.workDir, pathObj.rundir)
         os.makedirs(self.run_dir, exist_ok=True)
 
+        name_ifg_network = self.template['minopy.interferograms.type']
+        if self.template['minopy.interferograms.type'] == 'delaunay':
+            name_ifg_network += '_{}'.format(self.template['minopy.interferograms.delaunayBaselineRatio'])
+        elif self.template['minopy.interferograms.type'] == 'sequential':
+            name_ifg_network += '_{}'.format(self.template['minopy.interferograms.numSequential'])
+
         self.out_dir_network = '{}/{}'.format(self.workDir,
-                                              self.template['minopy.interferograms.type'] + '_network')
+                                              name_ifg_network + '_network')
         os.makedirs(self.out_dir_network, exist_ok=True)
 
         self.azimuth_look = 1
@@ -373,9 +379,15 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if self.template['minopy.interferograms.type'] == 'delaunay' and \
             self.template['minopy.interferograms.list'] in [None, 'None']:
-            scp_args = ' -b {} -o {} --temporalBaseline {} --perpBaseline {} --date_list {}'.format(
-                baseline_dir, short_baseline_ifgs, self.template['minopy.interferograms.delaunayTempThresh'],
-                self.template['minopy.interferograms.delaunayPerpThresh'], self.date_list_text)
+            #scp_args = ' -b {} -o {} --temporalBaseline {} --perpBaseline {} --date_list {}'.format(
+            #    baseline_dir, short_baseline_ifgs, self.template['minopy.interferograms.delaunayTempThresh'],
+            #    self.template['minopy.interferograms.delaunayPerpThresh'], self.date_list_text)
+
+            ifgram_dir += '_{}'.format(self.template['minopy.interferograms.delaunayBaselineRatio'])
+
+            scp_args = ' -b {} -o {} --baseline_ratio {} --date_list {}'.format(
+                baseline_dir, short_baseline_ifgs, self.template['minopy.interferograms.delaunayBaselineRatio'], self.date_list_text)
+
             find_baselines(scp_args.split())
             print('Successfully created short_baseline_ifgs.txt ')
             self.template['minopy.interferograms.list'] = short_baseline_ifgs
@@ -391,6 +403,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 pairs.append((line.split('_')[0], line.split('\n')[0].split('_')[1]))
         else:
             if self.template['minopy.interferograms.type'] == 'sequential':
+                ifgram_dir += '_{}'.format(self.template['minopy.interferograms.numSequential'])
                 num_seq = int(self.template['minopy.interferograms.numSequential'])
                 for t in range(0, num_seq-1):
                     for l in range(t + 1, num_seq):
@@ -436,6 +449,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             with open(os.path.join(self.out_dir_network, 'interferograms_list.txt'), 'w') as f:
                 f.writelines(ifgdates)
 
+        print('----- Number of interferograms in the selected network: {} -----'.format(len(pairs)))
         return ifgram_dir, pairs
 
 
