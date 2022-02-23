@@ -13,10 +13,12 @@ def cmd_line_parse(iargs=None):
     parser = argparse.ArgumentParser(description='find the minimum number of connected good interferograms')
     parser.add_argument('-b', '--baselineDir', dest='baseline_dir', type=str, help='Baselines directory')
     parser.add_argument('-o', '--outFile', dest='out_file', type=str, default='./bestints.txt', help='Output text file')
-    parser.add_argument('-t', '--temporalBaseline', dest='t_threshold', default=60, type=int,
-                        help='Temporal baseline threshold')
-    parser.add_argument('-p', '--perpBaseline', dest='p_threshold', default=200, type=int,
-                        help='Perpendicular baseline threshold')
+    #parser.add_argument('-t', '--temporalBaseline', dest='t_threshold', default=60, type=int,
+    #                    help='Temporal baseline threshold')
+    parser.add_argument('-r', '--baseline_ratio', dest='baseline_ratio', default=1, type=float,
+                        help='Ratio between temporal and perpendicular baseline (default = 1)')
+    #parser.add_argument('-p', '--perpBaseline', dest='p_threshold', default=200, type=int,
+    #                    help='Perpendicular baseline threshold')
     parser.add_argument('-d', '--date_list', dest='date_list', default=None, type=str,
                         help='Text file having existing SLC dates')
     #parser.add_argument('--MinSpanTree', dest='min_span_tree', action='store_true',
@@ -43,48 +45,55 @@ def find_baselines(iargs=None):
 
     days = [(datetime.strptime(date, '%Y%m%d') - datetime.strptime(dates[0], '%Y%m%d')).days for date in dates]
 
+    t_threshold = 60
+    p_threshold = 200
+    multplier = np.sqrt(inps.baseline_ratio)
+    inps.t_threshold = t_threshold * multplier
+    inps.p_threshold = p_threshold / multplier
+    days = [x / multplier for x in days]
+
     pairtr = []
     for i, date in enumerate(dates):
-        pairtr.append([days[i], baselines[date]])
+        pairtr.append([days[i], baselines[date] * multplier])
 
     pairtr = np.array(pairtr)
     tri = Delaunay(pairtr, incremental=False)
 
-    q = np.zeros([len(dates), len(dates)])
+    qm = np.zeros([len(dates), len(dates)])
 
     for trp in pairtr[tri.simplices]:
-        x1 = int(trp[0][0])
-        x2 = int(trp[1][0])
-        x3 = int(trp[2][0])
+        x1 = trp[0][0]
+        x2 = trp[1][0]
+        x3 = trp[2][0]
         b1 = trp[0][1]
         b2 = trp[1][1]
         b3 = trp[2][1]
         if np.abs(x1 - x2) <= inps.t_threshold:
-            q[days.index(x1), days.index(x2)] = np.abs(b1 - b2)
-            q[days.index(x2), days.index(x1)] = np.abs(b1 - b2)
+            qm[days.index(x1), days.index(x2)] = np.abs(b1 - b2)
+            qm[days.index(x2), days.index(x1)] = np.abs(b1 - b2)
         if np.abs(x2 - x3) <= inps.t_threshold:
-            q[days.index(x2), days.index(x3)] = np.abs(b2 - b3)
-            q[days.index(x3), days.index(x2)] = np.abs(b2 - b3)
+            qm[days.index(x2), days.index(x3)] = np.abs(b2 - b3)
+            qm[days.index(x3), days.index(x2)] = np.abs(b2 - b3)
         if np.abs(x1 - x3) <= inps.t_threshold:
-            q[days.index(x1), days.index(x3)] = np.abs(b1 - b3)
-            q[days.index(x3), days.index(x1)] = np.abs(b1 - b3)
+            qm[days.index(x1), days.index(x3)] = np.abs(b1 - b3)
+            qm[days.index(x3), days.index(x1)] = np.abs(b1 - b3)
 
-    q[q > inps.p_threshold] = 0
+    qm[qm > inps.p_threshold] = 0
 
     #if inps.min_span_tree:
-    #    X = csr_matrix(q)
+    #    X = csr_matrix(qm)
     #    Tcsr = minimum_spanning_tree(X)
     #    A = Tcsr.toarray()
     #else:
     #    for i in range(len(dates)):
-    #        if len(np.nonzero(q[i, :])[0]) <= 1:
-    #            q[i, :] = 0
-    #    A = np.triu(q)
+    #        if len(np.nonzero(qm[i, :])[0]) <= 1:
+    #            qm[i, :] = 0
+    #    A = np.triu(qm)
 
     for i in range(len(dates)):
-        if len(np.nonzero(q[i, :])[0]) <= 1:
-            q[i, :] = 0
-    A = np.triu(q)
+        if len(np.nonzero(qm[i, :])[0]) <= 1:
+            qm[i, :] = 0
+    A = np.triu(qm)
 
     ind1, ind2 = np.where(A > 0)
     ifgdates = ['{}_{}\n'.format(dates[g], dates[h]) for g, h in zip(ind1, ind2)]
