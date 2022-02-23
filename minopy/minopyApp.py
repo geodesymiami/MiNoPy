@@ -379,14 +379,13 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if self.template['minopy.interferograms.type'] == 'delaunay' and \
             self.template['minopy.interferograms.list'] in [None, 'None']:
-            #scp_args = ' -b {} -o {} --temporalBaseline {} --perpBaseline {} --date_list {}'.format(
-            #    baseline_dir, short_baseline_ifgs, self.template['minopy.interferograms.delaunayTempThresh'],
-            #    self.template['minopy.interferograms.delaunayPerpThresh'], self.date_list_text)
 
             ifgram_dir += '_{}'.format(self.template['minopy.interferograms.delaunayBaselineRatio'])
 
-            scp_args = ' -b {} -o {} --baseline_ratio {} --date_list {}'.format(
-                baseline_dir, short_baseline_ifgs, self.template['minopy.interferograms.delaunayBaselineRatio'], self.date_list_text)
+            scp_args = ' -b {} -o {} --temporalBaseline {} --perpBaseline {} --date_list {} --baseline_ratio {}'.format(
+                baseline_dir, short_baseline_ifgs, self.template['minopy.interferograms.delaunayTempThresh'],
+                self.template['minopy.interferograms.delaunayPerpThresh'], self.date_list_text,
+                self.template['minopy.interferograms.delaunayBaselineRatio'])
 
             find_baselines(scp_args.split())
             print('Successfully created short_baseline_ifgs.txt ')

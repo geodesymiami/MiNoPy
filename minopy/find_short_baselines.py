@@ -13,12 +13,12 @@ def cmd_line_parse(iargs=None):
     parser = argparse.ArgumentParser(description='find the minimum number of connected good interferograms')
     parser.add_argument('-b', '--baselineDir', dest='baseline_dir', type=str, help='Baselines directory')
     parser.add_argument('-o', '--outFile', dest='out_file', type=str, default='./bestints.txt', help='Output text file')
-    #parser.add_argument('-t', '--temporalBaseline', dest='t_threshold', default=60, type=int,
-    #                    help='Temporal baseline threshold')
     parser.add_argument('-r', '--baseline_ratio', dest='baseline_ratio', default=1, type=float,
                         help='Ratio between temporal and perpendicular baseline (default = 1)')
-    #parser.add_argument('-p', '--perpBaseline', dest='p_threshold', default=200, type=int,
-    #                    help='Perpendicular baseline threshold')
+    parser.add_argument('-t', '--temporalBaseline', dest='t_threshold', default=120, type=int,
+                        help='Temporal baseline threshold')
+    parser.add_argument('-p', '--perpBaseline', dest='p_threshold', default=200, type=int,
+                        help='Perpendicular baseline threshold')
     parser.add_argument('-d', '--date_list', dest='date_list', default=None, type=str,
                         help='Text file having existing SLC dates')
     #parser.add_argument('--MinSpanTree', dest='min_span_tree', action='store_true',
@@ -36,6 +36,9 @@ def find_baselines(iargs=None):
         date_list = f.readlines()
         date_list = [dd.split('\n')[0] for dd in date_list]
 
+    min_baselines = min(baselines.values())
+    max_baselines = max(baselines.values())
+
     dates = []
     for date in dates0:
         if date in date_list:
@@ -45,11 +48,11 @@ def find_baselines(iargs=None):
 
     days = [(datetime.strptime(date, '%Y%m%d') - datetime.strptime(dates[0], '%Y%m%d')).days for date in dates]
 
-    t_threshold = 60
-    p_threshold = 200
+    temp2perp_scale = np.abs((max_baselines - min_baselines) / (np.nanmin(np.array(days)) - np.nanmax(np.array(days))))
+    days = [tbase * temp2perp_scale for tbase in days]
+
+    inps.t_threshold *= temp2perp_scale
     multplier = np.sqrt(inps.baseline_ratio)
-    inps.t_threshold = t_threshold * multplier
-    inps.p_threshold = p_threshold / multplier
     days = [x / multplier for x in days]
 
     pairtr = []
