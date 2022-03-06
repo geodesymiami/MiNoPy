@@ -165,7 +165,7 @@ def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baselin
         Y = d.split('\n')[0].split(',')[1:3]
         y1 = float(Y[0])
         y2 = float(Y[1])
-        plt.plot([x1, x2], [y1, y2], 'k*-')
+        plt.plot([x1, x2], [y1, y2], 'ko-', markersize=10)
 
     plt.xlabel('Time [years]')
     plt.ylabel('Perp Baseline [m]')
