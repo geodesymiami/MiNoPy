@@ -20,7 +20,7 @@ from mintpy.utils import writefile, readfile, utils as ut
 from mintpy.smallbaselineApp import TimeSeriesAnalysis
 from minopy.objects.arg_parser import MinoPyParser
 from minopy.defaults.auto_path import autoPath, PathFind
-from minopy.find_short_baselines import find_baselines, plot_baselines
+import minopy.find_short_baselines as fb   # import find_baselines, plot_baselines
 from minopy.objects.utils import (check_template_auto_value,
                                   log_message, get_latest_template_minopy,
                                   read_initial_info, find_one_year_interferograms)
@@ -378,7 +378,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                 self.template['minopy.interferograms.delaunayPerpThresh'], self.date_list_text,
                 self.template['minopy.interferograms.delaunayBaselineRatio'])
 
-            find_baselines(scp_args.split())
+            fb.find_baselines(scp_args.split())
             print('Successfully created short_baseline_ifgs.txt ')
             self.template['minopy.interferograms.list'] = short_baseline_ifgs
 
@@ -409,21 +409,25 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                         pairs.append((self.date_list[indx], self.date_list[i]))
            
             if self.template['minopy.interferograms.type'] == 'mini_stacks':
-                total_num_mini_stacks = self.num_images // int(self.template['minopy.interferograms.ministackSize'])
-                #indx_ref_0 = None
+                mini_stack_size = int(self.template['minopy.interferograms.ministackSize'])
+                total_num_mini_stacks = self.num_images // mini_stack_size
+                bperp = fb.get_baselines_dict(baseline_dir)[0]
+
                 for i in range(total_num_mini_stacks):
-                    indx_ref = i * int(self.template['minopy.interferograms.ministackSize'])
-                    last_ind = indx_ref + int(self.template['minopy.interferograms.ministackSize']) + 1
+                    indx_ref = i * mini_stack_size
+                    last_ind = indx_ref + mini_stack_size + 1
                     if i == total_num_mini_stacks - 1:
                         last_ind = self.num_images
-                    #indx_ref_0 = indx_ref
+
                     indx_ref_1 = (last_ind - indx_ref) // 2 + indx_ref
                     for t in range(indx_ref, last_ind):
                         if t != indx_ref_1:
                             pairs.append((self.date_list[indx_ref_1], self.date_list[t]))
-                    #if not indx_ref_0 is None:
-                    #    pairs.append((self.date_list[indx_ref_0], self.date_list[indx_ref_1]))
-                    #indx_ref_0 = indx_ref_1
+
+                    if i < total_num_mini_stacks-1:
+                        pairs.append(fb.find_short_pbaseline_pair(bperp, self.date_list, mini_stack_size, last_ind))
+
+
         if self.template['minopy.interferograms.oneYear'] in ['yes', True]:
             one_years = find_one_year_interferograms(self.date_list)
             pairs += one_years
@@ -431,7 +435,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         for pair in pairs:
             ind1.append(self.date_list.index(pair[0]))
             ind2.append(self.date_list.index(pair[1]))
-        plot_baselines(ind1=ind1, ind2=ind2, dates=self.date_list,
+        fb.plot_baselines(ind1=ind1, ind2=ind2, dates=self.date_list,
                        baseline_dir=baseline_dir, out_dir=self.out_dir_network)
 
         if self.template['minopy.interferograms.list'] in [None, 'None', 'auto']:

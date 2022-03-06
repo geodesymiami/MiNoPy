@@ -137,6 +137,12 @@ def get_baselines_dict(baseline_dir):
                 baselines[secondary] = baseline
     return baselines, dates
 
+def find_short_pbaseline_pair(baselines, date_list, ministack_size, last_index):
+    second_index = np.arange(last_index + 1, last_index + ministack_size)
+    diff_bselines = [np.abs(baselines[date_list[last_index-2]] - baselines[date_list[i]]) for i in second_index]
+    min_ind = np.min(diff_bselines)
+    pair = (date_list[last_index-2], date_list[second_index[diff_bselines.index(min_ind)]])
+    return pair
 
 def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baseline_dir=None):
     import matplotlib.pyplot as plt
