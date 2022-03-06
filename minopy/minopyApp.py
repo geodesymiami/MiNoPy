@@ -357,10 +357,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         if not self.template['minopy.interferograms.list'] in [None, 'None', 'auto']:
             ifgram_dir = ifgram_dir + '_list'
+            os.makedirs(ifgram_dir, exist_ok='True')
         else:
             ifgram_dir = ifgram_dir + '_{}'.format(ifg_dir_names[self.template['minopy.interferograms.type']])
 
-        os.makedirs(ifgram_dir, exist_ok='True')
+
 
         if self.template['minopy.interferograms.referenceDate']:
             reference_date = self.template['minopy.interferograms.referenceDate']
@@ -372,6 +373,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
             self.template['minopy.interferograms.list'] in [None, 'None']:
 
             ifgram_dir += '_{}'.format(self.template['minopy.interferograms.delaunayBaselineRatio'])
+            os.makedirs(ifgram_dir, exist_ok='True')
 
             scp_args = ' -b {} -o {} --temporalBaseline {} --perpBaseline {} --date_list {} --baseline_ratio {}'.format(
                 baseline_dir, short_baseline_ifgs, self.template['minopy.interferograms.delaunayTempThresh'],
@@ -394,6 +396,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         else:
             if self.template['minopy.interferograms.type'] == 'sequential':
                 ifgram_dir += '_{}'.format(self.template['minopy.interferograms.numSequential'])
+                os.makedirs(ifgram_dir, exist_ok='True')
                 num_seq = int(self.template['minopy.interferograms.numSequential'])
                 for t in range(0, num_seq-1):
                     for l in range(t + 1, num_seq):
@@ -403,12 +406,14 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
                         pairs.append((self.date_list[i - t], self.date_list[i]))
 
             if self.template['minopy.interferograms.type'] == 'single_reference':
+                os.makedirs(ifgram_dir, exist_ok='True')
                 indx = self.date_list.index(reference_date)
                 for i in range(0, len(self.date_list)):
                     if not indx == i:
                         pairs.append((self.date_list[indx], self.date_list[i]))
            
             if self.template['minopy.interferograms.type'] == 'mini_stacks':
+                os.makedirs(ifgram_dir, exist_ok='True')
                 mini_stack_size = int(self.template['minopy.interferograms.ministackSize'])
                 total_num_mini_stacks = self.num_images // mini_stack_size
                 bperp = fb.get_baselines_dict(baseline_dir)[0]
