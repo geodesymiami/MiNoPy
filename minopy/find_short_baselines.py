@@ -187,6 +187,35 @@ def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baselin
 
     return
 
+def find_mini_stacks(date_list, baseline_dir, month=6):
+    pairs = []
+    dates = [datetime.strptime(date_str, '%Y%m%d') for date_str in date_list]
+    #bperp = get_baselines_dict(baseline_dir)[0]
+    years = np.array([x.year for x in dates])
+    u, indices_first = np.unique(years, return_index=True)
+    f_ind = indices_first
+    l_ind = np.zeros(indices_first.shape, dtype=np.int)
+    l_ind[0:-1] = np.array(f_ind[1::]).astype(np.int)
+    l_ind[-1] = len(dates)-1
+    ref_inds = []
+    for i in range(len(f_ind)):
+        months = np.array([x.month for x in dates[f_ind[i]:l_ind[i]]])
+        u, indices = np.unique(months, return_index=True)
+        ind = np.where(u == month)[0]
+        if len(ind) == 0:
+            ind = int(len(u)//2)
+        else:
+            ind = ind[0]
+        ref_ind = indices[ind] + f_ind[i]
+        ref_inds.append(ref_ind)
+
+        for k in range(f_ind[i], l_ind[i]):
+            pairs.append((date_list[ref_ind], date_list[k]))
+
+    for i in range(len(ref_inds)-1):
+        pairs.append((date_list[ref_inds[i]], date_list[ref_inds[i+1]]))
+        pairs.append((date_list[l_ind[i]-1], date_list[l_ind[i]]))
+    return pairs
 
 if __name__ == '__main__':
     find_baselines()
