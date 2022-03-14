@@ -414,24 +414,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
            
             if self.template['minopy.interferograms.type'] == 'mini_stacks':
                 os.makedirs(ifgram_dir, exist_ok='True')
-                mini_stack_size = int(self.template['minopy.interferograms.ministackSize'])
-                total_num_mini_stacks = self.num_images // mini_stack_size
-                bperp = fb.get_baselines_dict(baseline_dir)[0]
-
-                for i in range(total_num_mini_stacks):
-                    indx_ref = i * mini_stack_size
-                    last_ind = indx_ref + mini_stack_size + 1
-                    if i == total_num_mini_stacks - 1:
-                        last_ind = self.num_images
-
-                    indx_ref_1 = (last_ind - indx_ref) // 2 + indx_ref
-                    for t in range(indx_ref, last_ind):
-                        if t != indx_ref_1:
-                            pairs.append((self.date_list[indx_ref_1], self.date_list[t]))
-
-                    if i < total_num_mini_stacks-1:
-                        pairs.append(fb.find_short_pbaseline_pair(bperp, self.date_list, mini_stack_size, last_ind))
-
+                ref_date_month = 6
+                #ref_date_month = int(self.template['minopy.interferograms.ministackRefMonth'])
+                pairs = fb.find_mini_stacks(self.date_list, baseline_dir, month=ref_date_month)
 
         if self.template['minopy.interferograms.oneYear'] in ['yes', True]:
             one_years = find_one_year_interferograms(self.date_list)
