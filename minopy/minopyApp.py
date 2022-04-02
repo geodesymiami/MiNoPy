@@ -23,7 +23,7 @@ from minopy.defaults.auto_path import autoPath, PathFind
 import minopy.find_short_baselines as fb   # import find_baselines, plot_baselines
 from minopy.objects.utils import (check_template_auto_value,
                                   log_message, get_latest_template_minopy,
-                                  read_initial_info, find_one_year_interferograms)
+                                  read_initial_info)
 
 pathObj = PathFind()
 ###########################################################################################
@@ -417,12 +417,11 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
            
             if self.template['minopy.interferograms.type'] == 'mini_stacks':
                 os.makedirs(ifgram_dir, exist_ok='True')
-                ref_date_month = 6
-                #ref_date_month = int(self.template['minopy.interferograms.ministackRefMonth'])
+                ref_date_month = int(self.template['minopy.interferograms.ministackRefMonth'])
                 pairs = fb.find_mini_stacks(self.date_list, baseline_dir, month=ref_date_month)
 
         if self.template['minopy.interferograms.oneYear'] in ['yes', True]:
-            one_years = find_one_year_interferograms(self.date_list)
+            one_years = fb.find_one_year_interferograms(self.date_list)
             pairs += one_years
 
         for pair in pairs:
@@ -646,10 +645,20 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         if self.org_custom_template:
             custom_template = self.org_custom_template
 
-        cmd = '{} network_inversion.py --template {} --work_dir {}'.format(self.text_cmd.strip("'"),
-                                                                       custom_template,
-                                                                       self.out_dir_network)
-        if self.template['minopy.timeseries.shadowMask'] in [True, 'yes']:
+        coh_file = os.path.join(self.workDir, 'inverted/tempCoh_{}'.format(self.template['minopy.timeseries.tempCohType']))
+
+        cmd = '{} network_inversion.py --template {} --temp_coh {} --mask-thres {}' \
+              ' --norm {} --smooth_factor {} --weight-func {} --work_dir {}'.format(self.text_cmd.strip("'"),
+                                                                 custom_template, coh_file,
+                                                                 self.template['minopy.timeseries.minTempCoh'],
+                                                                 self.template['minopy.timeseries.residualNorm'],
+                                                                 self.template['minopy.timeseries.L1smoothingFactor'],
+                                                                 self.template['minopy.timeseries.L2weightFunc'],
+                                                                 self.out_dir_network)
+        if not self.template['minopy.timeseries.minNormVelocity']:
+            cmd += ' --min-norm-phase '
+
+        if self.template['minopy.timeseries.shadowMask']:
             cmd += ' --shadow_mask'
 
         run_commands = [cmd]
