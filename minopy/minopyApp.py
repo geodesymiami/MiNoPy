@@ -123,8 +123,8 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
 
         self.projectName = self.inps.projectName
 
-        self.run_dir = os.path.join(self.workDir, pathObj.rundir)
-        os.makedirs(self.run_dir, exist_ok=True)
+        #self.run_dir = os.path.join(self.workDir, pathObj.rundir)
+        #os.makedirs(self.run_dir, exist_ok=True)
 
         name_ifg_network = self.template['minopy.interferograms.type']
         if self.template['minopy.interferograms.type'] == 'delaunay':
@@ -135,6 +135,9 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         self.out_dir_network = '{}/{}'.format(self.workDir,
                                               name_ifg_network + '_network')
         os.makedirs(self.out_dir_network, exist_ok=True)
+
+        self.run_dir = os.path.join(self.out_dir_network, pathObj.rundir)
+        os.makedirs(self.run_dir, exist_ok=True)
 
         self.azimuth_look = 1
         self.range_look = 1
@@ -464,7 +467,7 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         num_lin = 0
         for pair in self.pairs:
             out_dir = os.path.join(self.ifgram_dir, pair[0] + '_' + pair[1])
-            os.makedirs(out_dir, exist_ok='True')
+            #os.makedirs(out_dir, exist_ok='True')
 
             scp_args = '--reference {a1} --secondary {a2} --output_dir {a3} --azimuth_looks {a4} ' \
                        '--range_looks {a5} --filter_strength {a6} ' \
