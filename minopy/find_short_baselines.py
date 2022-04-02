@@ -137,13 +137,6 @@ def get_baselines_dict(baseline_dir):
                 baselines[secondary] = baseline
     return baselines, dates
 
-def find_short_pbaseline_pair(baselines, date_list, ministack_size, last_index):
-    second_index = np.arange(last_index + 1, last_index + ministack_size)
-    diff_bselines = [np.abs(baselines[date_list[last_index-2]] - baselines[date_list[i]]) for i in second_index]
-    min_ind = np.min(diff_bselines)
-    pair = (date_list[last_index-2], date_list[second_index[diff_bselines.index(min_ind)]])
-    return pair
-
 def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baseline_dir=None):
     import matplotlib.pyplot as plt
     import matplotlib.dates as mdates
@@ -187,10 +180,19 @@ def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baselin
 
     return
 
+def find_short_pbaseline_pair(baselines, date_list, ministack_size, last_index):
+
+    second_index = np.arange(last_index - ministack_size + 1, last_index)
+    diff_bselines = [np.abs(baselines[date_list[last_index - ministack_size - 2]] - baselines[date_list[i]]) for i in second_index]
+    min_ind = np.min(diff_bselines)
+    pair = (date_list[last_index - ministack_size - 2], date_list[second_index[diff_bselines.index(min_ind)]])
+    return pair
+
+
 def find_mini_stacks(date_list, baseline_dir, month=6):
     pairs = []
     dates = [datetime.strptime(date_str, '%Y%m%d') for date_str in date_list]
-    #bperp = get_baselines_dict(baseline_dir)[0]
+    bperp = get_baselines_dict(baseline_dir)[0]
     years = np.array([x.year for x in dates])
     u, indices_first = np.unique(years, return_index=True)
     f_ind = indices_first
@@ -211,6 +213,9 @@ def find_mini_stacks(date_list, baseline_dir, month=6):
 
         for k in range(f_ind[i], l_ind[i]):
             pairs.append((date_list[ref_ind], date_list[k]))
+        ministack_size = l_ind[i] - f_ind[i]
+        if i > 0:
+            pairs.append(find_short_pbaseline_pair(bperp, date_list, ministack_size, l_ind[i]))
 
     for i in range(len(ref_inds)-1):
         pairs.append((date_list[ref_inds[i]], date_list[ref_inds[i+1]]))
