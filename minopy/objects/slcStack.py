@@ -35,6 +35,7 @@ dataType = np.complex64
 
 slcDatasetNames = ['slc']
 datasetUnitDict['slc'] = 'i'
+gdal.SetCacheMax(2**30)
 
 ########################################################################################
 
