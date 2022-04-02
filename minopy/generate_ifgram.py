@@ -52,8 +52,8 @@ def main(iargs=None):
     filtInt = os.path.dirname(resampInt) + '/filt_fine.int'
     cor_file = os.path.dirname(resampInt) + '/filt_fine.cor'
 
-    #if os.path.exists(cor_file + '.xml'):
-    #    return
+    if os.path.exists(cor_file + '.xml'):
+        return
 
     length, width = run_interferogram(inps, resampName)
 
