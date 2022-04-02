@@ -54,6 +54,8 @@ def main(iargs=None):
     # 1) invert ifgramStack for time-series
     stack_file = ut.check_loaded_dataset(inps.work_dir, print_msg=False)[1]
     iargs = [stack_file, '-t', inps.template_file, '--update'] #, '--calc-cov']
+    if template['minopy.interferograms.type'] in ['single_reference', 'mini_stacks']:
+        iargs = [stack_file, '-t', inps.template_file, '--update', '--mask_cc']
     print('\nifgram_inversion.py', ' '.join(iargs))
     ifgram_inversion.main(iargs)
 
