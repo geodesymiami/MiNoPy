@@ -526,7 +526,7 @@ def estimate_timeseries(A, B, Alpha, y, tbase_diff, weight_sqrt=None, min_norm_v
                     X, e2 = linalg.lstsq(B, y, cond=rcond)[:2]
 
             else:
-                X, e2 = invert_L1_norm_c(B, Alpha, y.flatten(), 100, np.max(Alpha))
+                X, e2 = invert_L1_norm_c(B, Alpha, y.flatten(), 5, np.max(Alpha))
                 X = np.array(X).reshape(-1, 1)
 
             # calc inversion quality
