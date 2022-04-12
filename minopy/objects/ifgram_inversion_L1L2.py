@@ -23,7 +23,14 @@ from mintpy.simulation import decorrelation as decor
 from mintpy.defaults.template import get_template_content
 from mintpy.utils import readfile, writefile, ptime, utils as ut, arg_group
 from minopy.lib.utils import invert_L1_norm_c
+from minopy.objects.utils import write_layout_hdf5
 import matplotlib.pyplot as plt
+from functools import partial
+import multiprocessing as mp
+import signal
+
+def init_worker():
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 # key configuration parameter name
 key_prefix = 'mintpy.networkInversion.'
@@ -398,7 +405,7 @@ def invert_L1_norm(R, Alpha, y, max_iter=100, smoothing_facor=0.0):
     diff_res = np.max(np.abs(res1 - res2))
 
     for ii in range(max_iter):
-        if diff_res <= 1e-5:
+        if diff_res <= 1e-3:
             break
         res1[:] = res2[:]
         W = np.diag(1/res.flatten())
@@ -526,7 +533,7 @@ def estimate_timeseries(A, B, Alpha, y, tbase_diff, weight_sqrt=None, min_norm_v
                     X, e2 = linalg.lstsq(B, y, cond=rcond)[:2]
 
             else:
-                X, e2 = invert_L1_norm_c(B, Alpha, y.flatten(), 5, np.max(Alpha))
+                X, e2 = invert_L1_norm(B, Alpha, y.flatten(), 100, np.max(Alpha))
                 X = np.array(X).reshape(-1, 1)
 
             # calc inversion quality
@@ -558,7 +565,7 @@ def estimate_timeseries(A, B, Alpha, y, tbase_diff, weight_sqrt=None, min_norm_v
                     X, e2 = linalg.lstsq(A, y, cond=rcond)[:2]
 
             else:
-                X, e2 = invert_L1_norm_c(A, Alpha, y.flatten(), 5, np.max(Alpha))
+                X, e2 = invert_L1_norm(A, Alpha, y.flatten(), 100, np.max(Alpha))
                 X = np.array(X).reshape(-1,1)
 
             # calc inversion quality
@@ -736,6 +743,44 @@ def calc_inv_quality(G, X, y, e2, inv_quality_name='temporalCoherence', weight_s
 
 ###################################### File IO ############################################
 def split2boxes(ifgram_file, max_memory=4, print_msg=True):
+    """Split into chunks in rows to reduce memory usage
+    Parameters: dataset_shape - tuple of 3 int
+                max_memory    - float, max memory to use in GB
+                print_msg     - bool
+    Returns:    box_list      - list of tuple of 4 int
+                num_box       - int, number of boxes
+    """
+    ifg_obj = ifgramStack(ifgram_file)
+    ifg_obj.open(print_msg=False)
+
+    # dataset size: defo obs (phase / offset) + weight + time-series
+    length = ifg_obj.length
+    width = ifg_obj.width
+    y_step = int(200)
+    x_step = int(2000)
+    nr = int(np.ceil(length / y_step))
+    nc = int(np.ceil(width / x_step))
+    num_box = int(np.ceil(length / y_step)) * int(np.ceil(width / x_step))
+    if print_msg and num_box > 1:
+        print('maximum memory size: %.1E GB' % max_memory)
+        print('split %d lines into %d patches for processing' % (length, num_box))
+        print('    with each patch up to %d lines and %d columns' % (y_step, x_step))
+
+    # y_step / num_box --> box_list
+    box_list = []
+    num_box = nr * nc
+    for i in range(nr):
+        for t in range(nc):
+            y0 = i * y_step
+            x0 = t * x_step
+            y1 = min([length, y0 + y_step])
+            x1 = min([width, x0 + x_step])
+            box = (x0, y0, x1, y1)
+            box_list.append(box)
+
+    return box_list, num_box
+
+def split2boxes_old(ifgram_file, max_memory=4, print_msg=True):
     """Split into chunks in rows to reduce memory usage
     Parameters: dataset_shape - tuple of 3 int
                 max_memory    - float, max memory to use in GB
@@ -998,9 +1043,10 @@ def get_design_matrix4std(stack_obj):
 
 
 
-def ifgram_inversion_patch(ifgram_file, box=None, ref_phase=None, obs_ds_name='unwrapPhase', temp_coherence=None,
+def ifgram_inversion_patch(box, ifgram_file=None, ref_phase=None, obs_ds_name='unwrapPhase', temp_coherence=None,
                            weight_func='var', water_mask_file=None, min_norm_velocity=True, residualNorm='L2',
-                           mask_ds_name=None, mask_threshold=0.4, min_redundancy=1.0, calc_cov=False, smoothing_factor=0.01):
+                           mask_ds_name=None, mask_threshold=0.4, min_redundancy=1.0, calc_cov=False,
+                           smoothing_factor=0.01):
     """Invert one patch of an ifgram stack into timeseries.
 
     Parameters: ifgram_file       - str, interferograms stack HDF5 file, e.g. ./inputs/ifgramStack.h5
@@ -1309,7 +1355,6 @@ def ifgram_inversion_patch(ifgram_file, box=None, ref_phase=None, obs_ds_name='u
     del stack_obs
     del stack_std
 
-
     ## 3. prepare output
 
     # 3.1 reshape
@@ -1435,6 +1480,8 @@ def ifgram_inversion(inps=None):
     print('number of columns : {}'.format(width))
 
     ## 2. prepare output
+    # 2.0 split ifgram_file into blocks to save memory
+    box_list, num_box = split2boxes(inps.ifgramStackFile, max_memory=inps.maxMemory)
 
     # 2.1 metadata
     meta = dict(stack_obj.metadata)
@@ -1447,13 +1494,14 @@ def ifgram_inversion(inps=None):
 
     # 2.2 instantiate time-series
     dates = np.array(date_list, dtype=np.string_)
+    box_check = np.array(num_box, dtype=np.bool_)
     pbase = stack_obj.get_perp_baseline_timeseries(dropIfgram=True)
     ds_name_dict = {
         "date"       : [dates.dtype, (num_date,), dates],
         "bperp"      : [np.float32,  (num_date,), pbase],
         "timeseries" : [np.float32,  (num_date, length, width), None],
     }
-    writefile.layout_hdf5(inps.tsFile, ds_name_dict, metadata=meta)
+    write_layout_hdf5(inps.tsFile, ds_name_dict, metadata=meta)
 
     if inps.calcCov:
         fbase = os.path.splitext(inps.tsFile)[0]
@@ -1462,7 +1510,7 @@ def ifgram_inversion(inps=None):
         meta['REF_DATE'] = ref_date4std
         ds_name_dict = {"date"       : [dates.dtype, (num_date,), dates],
                         "timeseries" : [np.float32,  (num_date, num_date, length, width), None]}
-        writefile.layout_hdf5(tsStdFile, ds_name_dict, meta)
+        write_layout_hdf5(tsStdFile, ds_name_dict, meta)
 
     # 2.3 instantiate invQualifyFile: temporalCoherence / residualInv
     if 'residual' in os.path.basename(inps.invQualityFile).lower():
@@ -1474,18 +1522,19 @@ def ifgram_inversion(inps=None):
     meta['FILE_TYPE'] = inv_quality_name
     meta.pop('REF_DATE')
     ds_name_dict = {meta['FILE_TYPE'] : [np.float32, (length, width)]}
-    writefile.layout_hdf5(inps.invQualityFile, ds_name_dict, metadata=meta)
+    write_layout_hdf5(inps.invQualityFile, ds_name_dict, metadata=meta)
 
     # 2.4 instantiate number of inverted observations
     meta['FILE_TYPE'] = 'mask'
     meta['UNIT'] = '1'
     ds_name_dict = {"mask" : [np.float32, (length, width)]}
-    writefile.layout_hdf5(inps.numInvFile, ds_name_dict, metadata=meta)
+    write_layout_hdf5(inps.numInvFile, ds_name_dict, metadata=meta)
 
     ## 3. run the inversion / estimation and write to disk
 
-    # 3.1 split ifgram_file into blocks to save memory
-    box_list, num_box = split2boxes(inps.ifgramStackFile, max_memory=inps.maxMemory)
+    work_dir = os.getcwd()
+    out_dir_boxes = os.path.join(work_dir, 'inverted')
+    os.makedirs(out_dir_boxes, exist_ok=True)
 
     # 3.2 prepare the input arguments for *_patch()
     data_kwargs = {
@@ -1501,11 +1550,23 @@ def ifgram_inversion(inps=None):
         "calc_cov"          : inps.calcCov,
         "residualNorm"      : inps.residualNorm,
         "temp_coherence"    : inps.temp_coh,
-        "smoothing_factor"  : inps.L1_alpha
+        "smoothing_factor"  : inps.L1_alpha,
     }
+
+
+    print('------- finished parallel processing -------\n\n')
 
     # 3.3 invert / write block-by-block
     for i, box in enumerate(box_list):
+        out_box_folder = os.path.join(out_dir_boxes, 'box_{:04.0f}'.format(i))
+        os.makedirs(out_box_folder, exist_ok=True)
+        if os.path.exists(out_box_folder + '/working_flag.npy'):
+            continue
+        if os.path.exists(os.path.join(out_box_folder, 'num_inv_obs.npy')):
+            continue
+        else:
+            np.save(out_box_folder + '/working_flag.npy', [1])
+
         box_wid = box[2] - box[0]
         box_len = box[3] - box[1]
         if num_box > 1:
@@ -1543,6 +1604,20 @@ def ifgram_inversion(inps=None):
             cluster_obj.close()
 
             print('------- finished parallel processing -------\n\n')
+        np.save(out_box_folder + '/ts.npy', ts)
+        np.save(out_box_folder + '/ts_cov.npy', ts_cov)
+        np.save(out_box_folder + '/inv_quality.npy', inv_quality)
+        np.save(out_box_folder + '/num_inv_obs.npy', num_inv_obs)
+        os.system('rm {}'.format(out_box_folder + '/working_flag.npy'))
+
+    for i, box in enumerate(box_list):
+        out_box_folder = os.path.join(out_dir_boxes, 'box_{:04.0f}'.format(i))
+        if not os.path.exists(out_box_folder + '/num_inv_obs.npy'):
+            raise RuntimeError('Inversion is not completed, Run this step again.')
+        ts = np.load(out_box_folder + '/ts.npy', allow_pickle=True)
+        ts_cov = np.load(out_box_folder + '/ts_cov.npy', allow_pickle=True)
+        inv_quality = np.load(out_box_folder + '/inv_quality.npy', allow_pickle=True)
+        num_inv_obs = np.load(out_box_folder + '/num_inv_obs.npy', allow_pickle=True)
 
         # write the block to disk
         # with 3D block in [z0, z1, y0, y1, x0, x1]

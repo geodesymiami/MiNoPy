@@ -1371,7 +1371,7 @@ cdef inline tuple iterate_L1_norm(float[::1] ifg, float[:,::1] G, float[:,::1] W
     res = calc_residuals(ifg, G, X)
     diff_res = calculate_diff_res_max(res, res1)
     for ii in range(max_iter):
-        if diff_res <= 1e-5:
+        if diff_res <= 0.5:
             break
         W1 = inv_diag_mat(res)
         inv_Q = LA.pinv2(multiplymat22_float(multiplymat22_float(transposemat(G), W1), G ))
