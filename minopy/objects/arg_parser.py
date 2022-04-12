@@ -410,7 +410,7 @@ class MinoPyParser:
         parser.add_argument('--min-norm-phase', dest='minNormVelocity', action='store_false',
                             help=('Enable inversion with minimum-norm deformation phase,'
                                   ' instead of the default minimum-norm deformation velocity.'))
-        parser.add_argument('--norm', dest='residualNorm', default='L1', choices=['L1', 'L2'],
+        parser.add_argument('--norm', dest='residualNorm', default='L1', choices=['L1', 'L2', 'L1_intLsq', 'L2_intLsq'],
                             help='Optimization mehtod, L1 or L2 norm. (default: %(default)s).')
         parser.add_argument('--smooth_factor', dest='L1_alpha', default=0.01,
                             help='Smoothing factor for L1 inversion [0-1] default: 0.01.')

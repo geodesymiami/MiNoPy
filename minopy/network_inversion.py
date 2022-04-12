@@ -54,7 +54,8 @@ def main(iargs=None):
 
     # 1) invert ifgramStack for time-series
     stack_file = ut.check_loaded_dataset(inps.work_dir, print_msg=False)[1]
-    iargs = [stack_file, '-t', inps.template_file, '--update', '--norm', inps.residualNorm,
+    wrapped_phase_series = os.path.join(minopy_dir, 'inverted/phase_series.h5')
+    iargs = [stack_file, wrapped_phase_series, '-t', inps.template_file, '--update', '--norm', inps.residualNorm,
              '--tcoh', inps.temp_coh, '--mask-threshold', str(inps.maskThreshold),
              '--smooth_factor', inps.L1_alpha] #, '--calc-cov']
 
