@@ -9,7 +9,7 @@ import datetime
 from minopy.objects.arg_parser import MinoPyParser
 from mintpy.utils import readfile, utils as ut
 #from mintpy import ifgram_inversion
-from minopy.objects import ifgram_inversion_L1L2
+from minopy.dev import ifgram_inversion_L1L2
 import generate_temporal_coherence
 
 ############################################################
@@ -54,8 +54,8 @@ def main(iargs=None):
 
     # 1) invert ifgramStack for time-series
     stack_file = ut.check_loaded_dataset(inps.work_dir, print_msg=False)[1]
-    wrapped_phase_series = os.path.join(minopy_dir, 'inverted/phase_series.h5')
-    iargs = [stack_file, wrapped_phase_series, '-t', inps.template_file, '--update', '--norm', inps.residualNorm,
+    #wrapped_phase_series = os.path.join(minopy_dir, 'inverted/phase_series.h5')
+    iargs = [stack_file, '-t', inps.template_file, '--update', '--norm', inps.residualNorm,
              '--tcoh', inps.temp_coh, '--mask-threshold', str(inps.maskThreshold),
              '--smooth_factor', inps.L1_alpha] #, '--calc-cov']
 
