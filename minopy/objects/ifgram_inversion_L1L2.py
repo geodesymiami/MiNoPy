@@ -1372,6 +1372,8 @@ def ifgram_inversion_patch(box, ifgram_file=None, wrappedIfgramStack=None, ref_p
     for tt in range(num_date):
         wrapped_phase_ts[tt, :] -= ref_date_phase
 
+    wrapped_phase_ts = np.angle(np.exp(1j*wrapped_phase_ts))
+
     ts = wrapped_phase_ts + ts * 2 * np.pi
 
     # 3.1 reshape
