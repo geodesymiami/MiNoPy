@@ -137,6 +137,7 @@ def get_baselines_dict(baseline_dir):
                 baselines[secondary] = baseline
     return baselines, dates
 
+
 def plot_baselines(ind1, ind2, dates=None, baselines=None, out_dir=None, baseline_dir=None):
     import matplotlib.pyplot as plt
     import matplotlib.dates as mdates

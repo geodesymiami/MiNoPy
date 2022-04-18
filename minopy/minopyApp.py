@@ -132,6 +132,12 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
         elif self.template['minopy.interferograms.type'] == 'sequential':
             name_ifg_network += '_{}'.format(self.template['minopy.interferograms.numSequential'])
 
+        name_ifg_network = self.template['minopy.interferograms.type']
+        if self.template['minopy.interferograms.type'] == 'delaunay':
+            name_ifg_network += '_{}'.format(self.template['minopy.interferograms.delaunayBaselineRatio'])
+        elif self.template['minopy.interferograms.type'] == 'sequential':
+            name_ifg_network += '_{}'.format(self.template['minopy.interferograms.numSequential'])
+
         self.out_dir_network = '{}/{}'.format(self.workDir,
                                               name_ifg_network + '_network')
         os.makedirs(self.out_dir_network, exist_ok=True)
@@ -417,8 +423,10 @@ class minopyTimeSeriesAnalysis(TimeSeriesAnalysis):
            
             if self.template['minopy.interferograms.type'] == 'mini_stacks':
                 os.makedirs(ifgram_dir, exist_ok='True')
+
                 ref_date_month = int(self.template['minopy.interferograms.ministackRefMonth'])
                 pairs = fb.find_mini_stacks(self.date_list, baseline_dir, month=ref_date_month)
+
 
         if self.template['minopy.interferograms.oneYear'] in ['yes', True]:
             one_years = fb.find_one_year_interferograms(self.date_list)

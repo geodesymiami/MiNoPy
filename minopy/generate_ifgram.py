@@ -110,13 +110,16 @@ def run_interferogram(inps, resampName):
                 sec_phase = phase_series[sec_ind, row_1:row_2, col_1:col_2].reshape(row_2 - row_1, col_2 - col_1)
                 ref_amplitude = amplitudes[ref_ind, row_1:row_2, col_1:col_2].reshape(row_2 - row_1, col_2 - col_1)
                 sec_amplitude = amplitudes[sec_ind, row_1:row_2, col_1:col_2].reshape(row_2 - row_1, col_2 - col_1)
+
                 ifg = (ref_amplitude * sec_amplitude) * np.exp(1j * (ref_phase - sec_phase))
+
                 out_ifg[row_1:row_2, col_1:col_2, 0] = ifg[:, :]
 
         intImage.renderHdr()
         intImage.finalizeImage()
 
     return length, width
+
 
 
 def runFilter(infile, outfile, filterStrength):
