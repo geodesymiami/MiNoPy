@@ -22,15 +22,10 @@ from mintpy.objects import ifgramStack, cluster
 from mintpy.simulation import decorrelation as decor
 from mintpy.defaults.template import get_template_content
 from mintpy.utils import readfile, writefile, ptime, utils as ut, arg_group
-from minopy.lib.utils import invert_L1_norm_c
+#from minopy.lib.utils import invert_L1_norm_c
 from minopy.objects.utils import write_layout_hdf5
 import matplotlib.pyplot as plt
-from functools import partial
-import multiprocessing as mp
-import signal
 
-def init_worker():
-    signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 # key configuration parameter name
 key_prefix = 'mintpy.networkInversion.'
