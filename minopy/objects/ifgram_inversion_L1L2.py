@@ -75,6 +75,7 @@ def create_parser():
                                      epilog=REFERENCE+'\n'+TEMPLATE+'\n'+EXAMPLE)
     # input dataset
     parser.add_argument('ifgramStackFile', help='interferograms stack file to be inverted')
+    parser.add_argument('wrappedIfgramStack', help='Wrapped interferograms stack file to be inverted')
     parser.add_argument('-t','--template', dest='templateFile', help='template text file with options')
 
     parser.add_argument('-i','-d', '--dset', dest='obsDatasetName', type=str,
@@ -103,7 +104,7 @@ def create_parser():
     solver.add_argument('--min-norm-phase', dest='minNormVelocity', action='store_false',
                         help=('Enable inversion with minimum-norm deformation phase,'
                               ' instead of the default minimum-norm deformation velocity.'))
-    solver.add_argument('--norm', dest='residualNorm', default='L2', choices=['L1', 'L2'],
+    solver.add_argument('--norm', dest='residualNorm', default='L2', choices=['L1', 'L2', 'L1_intLsq', 'L2_intLsq'],
                         help='Optimization mehtod, L1 or L2 norm. (default: %(default)s).')
     solver.add_argument('--smooth_factor', dest='L1_alpha', type=float, default=0.01,
                         help='Smoothing factor for L1 inversion [0-1] default: 0.01.')
@@ -420,7 +421,7 @@ def invert_L1_norm(R, Alpha, y, max_iter=100, smoothing_facor=0.0):
     return X, e1
 
 
-def estimate_timeseries(A, B, Alpha, y, tbase_diff, weight_sqrt=None, min_norm_velocity=True,
+def estimate_timeseries(A, B, Alpha, y0, tbase_diff, weight_sqrt=None, min_norm_velocity=True,
                         rcond=1e-5, min_redundancy=1., inv_quality_name='temporalCoherence',
                         print_msg=True, refIndx=None, residualNorm='L2'):
     """Estimate time-series from a stack/network of interferograms with
@@ -472,7 +473,7 @@ def estimate_timeseries(A, B, Alpha, y, tbase_diff, weight_sqrt=None, min_norm_v
                                     used during the inversion
     """
 
-    y = y.reshape(A.shape[0], -1)
+    y = y0.reshape(A.shape[0], -1)
     if weight_sqrt is not None:
         weight_sqrt = weight_sqrt.reshape(A.shape[0], -1)
     num_date = A.shape[1] + 1
@@ -516,10 +517,15 @@ def estimate_timeseries(A, B, Alpha, y, tbase_diff, weight_sqrt=None, min_norm_v
     #    except linalg.LinAlgError:
     #        return ts, inv_quality, num_inv_obs
     ##### invert time-series
+
+    #if residualNorm.endswith('intLsq'):
+    #    y_wrap = np.angle(np.exp(1j * y))
+    #    y = (y - y_wrap) // (2 * np.pi)    #integers
+
     try:
         if min_norm_velocity:
             ##### min-norm velocity
-            if residualNorm == 'L2':
+            if residualNorm.startswith('L2'):
                 if weight_sqrt is not None:
                     X, e2 = linalg.lstsq(np.multiply(B, weight_sqrt),
                                          np.multiply(y, weight_sqrt),
@@ -530,6 +536,9 @@ def estimate_timeseries(A, B, Alpha, y, tbase_diff, weight_sqrt=None, min_norm_v
             else:
                 X, e2 = invert_L1_norm(B, Alpha, y.flatten(), 100, np.max(Alpha))
                 X = np.array(X).reshape(-1, 1)
+
+            #if residualNorm.endswith('intLsq'):
+            #    X = np.rint(X)
 
             # calc inversion quality
             inv_quality = calc_inv_quality(B, X, y, e2,
@@ -542,16 +551,16 @@ def estimate_timeseries(A, B, Alpha, y, tbase_diff, weight_sqrt=None, min_norm_v
             if not nz_flag is None:
                 ts_flag = np.concatenate(([False], nz_flag))
                 ts_flag_2 = (1 - ts_flag).astype(np.bool)
-                ts[ts_flag, :] = np.cumsum(ts_diff, axis=0)
+                ts[ts_flag, :] = np.cumsum(ts_diff, axis=0).astype(int)
                 ts[ts_flag_2, :] = np.nan
                 if np.sum(~np.isnan(ts)) > 2:
                     ts[0, :] = 0
             else:
-                ts[1:, :] = np.cumsum(ts_diff, axis=0)
+                ts[1:, :] = np.cumsum(ts_diff, axis=0).astype(int)
 
         else:
             ##### min-norm displacement
-            if residualNorm == 'L2':
+            if residualNorm.startswith('L2'):
                 if weight_sqrt is not None:
                     X, e2 = linalg.lstsq(np.multiply(A, weight_sqrt),
                                          np.multiply(y, weight_sqrt),
@@ -561,7 +570,10 @@ def estimate_timeseries(A, B, Alpha, y, tbase_diff, weight_sqrt=None, min_norm_v
 
             else:
                 X, e2 = invert_L1_norm(A, Alpha, y.flatten(), 100, np.max(Alpha))
-                X = np.array(X).reshape(-1,1)
+                X = np.array(X).reshape(-1, 1)
+
+            if residualNorm.endswith('intLsq'):
+                X = np.rint(X)
 
             # calc inversion quality
             inv_quality = calc_inv_quality(A, X, y, e2,
@@ -1037,8 +1049,7 @@ def get_design_matrix4std(stack_obj):
     return A_std, ref_ind, ref_date, flag_std
 
 
-
-def ifgram_inversion_patch(box, ifgram_file=None, ref_phase=None, obs_ds_name='unwrapPhase', temp_coherence=None,
+def ifgram_inversion_patch(box, ifgram_file=None, wrappedIfgramStack=None, ref_phase=None, obs_ds_name='unwrapPhase', temp_coherence=None,
                            weight_func='var', water_mask_file=None, min_norm_velocity=True, residualNorm='L2',
                            mask_ds_name=None, mask_threshold=0.4, min_redundancy=1.0, calc_cov=False,
                            smoothing_factor=0.01):
@@ -1070,7 +1081,6 @@ def ifgram_inversion_patch(box, ifgram_file=None, ref_phase=None, obs_ds_name='u
     ## debug on a specific pixel
     #y, x = 555, 612
     #box = (x, y, x+1, y+1)
-
 
     ## 1. input info
 
@@ -1157,6 +1167,11 @@ def ifgram_inversion_patch(box, ifgram_file=None, ref_phase=None, obs_ds_name='u
     stack_obs = read_stack_obs(stack_obj, box, ref_phase,
                                obs_ds_name=obs_ds_name,
                                dropIfgram=True)
+
+    if residualNorm.endswith('intLsq'):
+        stack_obs_w = readfile.read(ifgram_file, datasetName='wrapPhase', box=box)[0]
+        stack_obs_w = stack_obs_w.reshape(stack_obs.shape)
+        stack_obs = (stack_obs - stack_obs_w) / (2 * np.pi)
 
     # translate zero phase value to nan (no-data value)
     # becuase it's the common filled value used in phase masking
@@ -1256,7 +1271,7 @@ def ifgram_inversion_patch(box, ifgram_file=None, ref_phase=None, obs_ds_name='u
             (tsi,
              inv_quali,
              num_obsi) = estimate_timeseries(A, B, Alpha,
-                                             y=stack_obs[:, mask_all_net],
+                                             y0=stack_obs[:, mask_all_net],
                                              tbase_diff=tbase_diff,
                                              weight_sqrt=None,
                                              min_norm_velocity=min_norm_velocity,
@@ -1284,7 +1299,7 @@ def ifgram_inversion_patch(box, ifgram_file=None, ref_phase=None, obs_ds_name='u
                 (tsi,
                  inv_quali,
                  num_obsi) = estimate_timeseries(A, B, Alpha,
-                                                 y=stack_obs[:, idx],
+                                                 y0=stack_obs[:, idx],
                                                  tbase_diff=tbase_diff,
                                                  weight_sqrt=None,
                                                  min_norm_velocity=min_norm_velocity,
@@ -1309,7 +1324,7 @@ def ifgram_inversion_patch(box, ifgram_file=None, ref_phase=None, obs_ds_name='u
             (tsi,
              inv_quali,
              num_obsi) = estimate_timeseries(A, B, Alpha,
-                                             y=stack_obs[:, idx],
+                                             y0=stack_obs[:, idx],
                                              tbase_diff=tbase_diff,
                                              weight_sqrt=weight_sqrt[:, idx],
                                              min_norm_velocity=min_norm_velocity,
@@ -1351,6 +1366,13 @@ def ifgram_inversion_patch(box, ifgram_file=None, ref_phase=None, obs_ds_name='u
     del stack_std
 
     ## 3. prepare output
+    wrapped_phase_ts = readfile.read(wrappedIfgramStack, datasetName='phase', box=box)[0]
+    wrapped_phase_ts = wrapped_phase_ts.reshape(num_date, -1)
+    ref_date_phase = wrapped_phase_ts[refIndx, :] #.reshape(1, -1)
+    for tt in range(num_date):
+        wrapped_phase_ts[tt, :] -= ref_date_phase
+
+    ts = wrapped_phase_ts + ts * 2 * np.pi
 
     # 3.1 reshape
     ts = ts.reshape(num_date, num_row, num_col)
@@ -1546,6 +1568,7 @@ def ifgram_inversion(inps=None):
         "residualNorm"      : inps.residualNorm,
         "temp_coherence"    : inps.temp_coh,
         "smoothing_factor"  : inps.L1_alpha,
+        "wrappedIfgramStack": inps.wrappedIfgramStack,
     }
 
 
@@ -1690,7 +1713,7 @@ def main(iargs=None):
     #else:
     #    raise NotImplementedError('L1 norm minimization is not fully tested.')
         #ut.timeseries_inversion_L1(inps.ifgramStackFile, inps.tsFile)
-
+    #inps.wrappedIfgramStack
     return inps.outfile
 
 
